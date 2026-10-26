@@ -1,6 +1,6 @@
 {
   "name": "bmad-kanban",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Read-only local Kanban board for BMAD Method projects (v6 and v7 layouts)",
   "type": "module",
   "license": "MIT",
