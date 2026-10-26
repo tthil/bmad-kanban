@@ -1,0 +1,17 @@
+---
+id: 2
+type: story
+title: "Tax rules"
+parent: epic-pricing-rules
+covers: ["R2"]
+after: [1]
+refined: true
+hitl: false
+risk: medium
+---
+
+# Tax rules
+
+## Description
+
+Adds regional tax rules to the pricing function.

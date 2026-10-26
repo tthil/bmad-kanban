@@ -1,0 +1,9 @@
+- id: "1"
+  title: Add to cart
+  description: Cart add flow.
+- id: "2"
+  title: Apply discount
+  description: Discount codes.
+- id: "3"
+  title: Pay
+  description: Payment.

@@ -1,0 +1,13 @@
+[[epic]]
+id = 1
+slug = "epic-pricing-rules"
+title = "Pricing rules"
+description = "Every price a shopper sees comes from one pricing function, deployed."
+covers = ["R1", "R2"]
+
+[[epic]]
+id = 2
+slug = "epic-cart-rules"
+title = "Cart rules"
+description = "A shopper adds, changes and removes items and the total follows."
+covers = ["R3"]

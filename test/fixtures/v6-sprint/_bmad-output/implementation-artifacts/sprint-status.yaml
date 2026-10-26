@@ -1,0 +1,12 @@
+generated: 2026-10-26
+project: demo
+development_status:
+  epic-1: in-progress
+  1-1-user-login: done
+  1-2-password-reset: contexted
+  epic-1-retrospective: optional
+  epic-2: backlog
+  2-1-plant-data-model: ready-for-dev
+  2-9-orphan-story: review
+action_items:
+  - something to ignore

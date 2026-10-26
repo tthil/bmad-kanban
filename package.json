@@ -1,0 +1,54 @@
+{
+  "name": "bmad-kanban",
+  "version": "0.1.0",
+  "description": "Read-only local Kanban board for BMAD Method projects (v6 and v7 layouts)",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "bmad-kanban": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\" && tsc -p . && vite build",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc -p . --noEmit && tsc -p web",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^26.6.5",
+    "dompurify": "^3.4.17",
+    "marked": "^18.1.1",
+    "preact": "^11.0.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "env-paths": "^4.0.0",
+    "open": "^11.0.4",
+    "smol-toml": "^1.9.1",
+    "yaml": "^2.9.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tthil/bmad-kanban.git"
+  },
+  "homepage": "https://github.com/tthil/bmad-kanban#readme",
+  "bugs": {
+    "url": "https://github.com/tthil/bmad-kanban/issues"
+  },
+  "keywords": [
+    "bmad",
+    "kanban",
+    "cli"
+  ]
+}
