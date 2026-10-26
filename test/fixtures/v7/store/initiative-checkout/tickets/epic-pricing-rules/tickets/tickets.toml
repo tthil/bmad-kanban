@@ -1,0 +1,54 @@
+[[entry]]
+id = 1
+type = "story"
+title = "Pricing function"
+description = "Extracts one pricing function used by every price display."
+verify = "A shopper sees the same price on the product page and in the cart."
+covers = ["R1"]
+after = []
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 2
+type = "story"
+title = "Tax rules"
+description = "Adds regional tax rules to the pricing function."
+verify = "A UK shopper sees VAT included in the total."
+covers = ["R2"]
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 3
+type = "spike"
+title = "Spike: rounding"
+description = "Finds out whether rounding per line or per order matches the finance export."
+verify = "A short note states which rounding rule matches the export."
+covers = ["R2"]
+after = [1]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Old idea"
+description = "An early idea that was set aside."
+verify = "Not applicable."
+covers = []
+after = []
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Legacy"
+description = "A story whose status still lives in its leaf file."
+verify = "The legacy flow still works."
+covers = ["R1"]
+after = []
+hitl = false
+risk = "low"

@@ -1,0 +1,13 @@
+[[initiative]]
+id = 1
+slug = "initiative-checkout"
+title = "Shoppers check out online"
+description = "A shopper prices a cart and pays for an order on the live site."
+covers = []
+
+[[initiative]]
+id = 2
+slug = "initiative-flat"
+title = "A small flat initiative"
+description = "A small flat body of work."
+covers = []
