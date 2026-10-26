@@ -14,6 +14,9 @@ const cases: [Layout, string | null, Column, object?][] = [
   ['v6-sprint', 'wibble', 'backlog', { unknownStatus: 'wibble' }],
   ['v6-sprint', 'in progress', 'in-progress'], ['v6-sprint', 'IN-PROGRESS', 'in-progress'],
   ['v6-sprint', '  Ready For Dev ', 'ready'],
+  ['v6-sprint', 'constructor', 'backlog', { unknownStatus: 'constructor' }],
+  ['v6-spec', '__proto__', 'backlog', { unknownStatus: '__proto__' }],
+  ['v7', 'toString', 'backlog', { unknownStatus: 'toString' }],
 ];
 test.each(cases)('%s %s → %s', (layout, raw, column, extra = {}) =>
   expect(mapStatus(layout, raw)).toEqual({ column, ...extra }));
@@ -23,6 +26,10 @@ test('v7 state covers all states', () => {
   expect(mapV7State('in-progress')).toBe('in-progress');
   expect(mapV7State('done')).toBe('done');
   expect(mapV7State('dropped')).toBe('dropped');
+});
+test('v7 state ignores prototype keys', () => {
+  expect(mapV7State('constructor')).toBe('backlog');
+  expect(mapV7State('__proto__')).toBe('backlog');
 });
 test('COLUMNS order', () =>
   expect(COLUMNS).toEqual(['backlog', 'ready', 'in-progress', 'review', 'done']));

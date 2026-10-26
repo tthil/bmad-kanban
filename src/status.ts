@@ -43,7 +43,8 @@ export function mapStatus(
 ): { column: Column; blocked?: boolean; unknownStatus?: string } {
   const key = (raw ?? '').trim().toLowerCase().replace(/\s+/g, '-');
   if (key === '') return { column: 'backlog' };
-  const hit = TABLES[layout][key];
+  const table = TABLES[layout];
+  const hit = Object.hasOwn(table, key) ? table[key] : undefined;
   if (hit) return hit.blocked ? { column: hit.column, blocked: true } : { column: hit.column };
   return { column: 'backlog', unknownStatus: (raw ?? '').trim() };
 }
@@ -58,5 +59,6 @@ const V7_STATES: Record<string, Column> = {
 
 /** Map a v7 `state` value (tickets.py) to a column. */
 export function mapV7State(state: string): Column {
-  return V7_STATES[state.trim().toLowerCase()] ?? 'backlog';
+  const key = state.trim().toLowerCase();
+  return Object.hasOwn(V7_STATES, key) ? V7_STATES[key] : 'backlog';
 }
