@@ -98,8 +98,23 @@ describe('readV7Tree other kinds', () => {
     const b = readV7Tree(path.join(store, 'initiative-parent'), 'parent', 's');
     expect(b.kind).toBe('v7-parent');
     expect(b.children?.map((c) => c.label)).toEqual(['initiative-checkout', 'initiative-flat']);
+    expect(b.children?.map((c) => c.sourceId)).toEqual(['v7:initiative-checkout', 'v7:initiative-flat']);
     expect(b.children?.[0].stories).toHaveLength(5);
     expect(hasReduced(b)).toBe(true);
+  });
+
+  it('does not recurse into a self-referencing or nested parent', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'v7-'));
+    const dir = path.join(tmp, 'initiative-loop');
+    fs.mkdirSync(path.join(dir, 'tickets'), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'tickets', 'tickets.toml'),
+      '[[initiative]]\nid = 1\nslug = "initiative-loop"\ntitle = "Loop"\n',
+    );
+    const b = readV7Tree(dir, 'parent', 's');
+    expect(b.children).toEqual([]);
+    expect(b.notices.some((n) => n.level === 'warn' && n.text.includes('parent'))).toBe(true);
+    fs.rmSync(tmp, { recursive: true });
   });
 
   it('turns a malformed tickets.toml into an error notice', () => {

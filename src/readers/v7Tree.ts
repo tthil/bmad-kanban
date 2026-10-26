@@ -306,11 +306,15 @@ function readParent(folder: string, sourceId: string): Board {
     }
     const dir = path.join(path.dirname(folder), t.slug);
     const kind = isDir(dir) ? folderKind(dir) : null;
+    if (kind === 'parent') {
+      notices.push({ level: 'warn', text: `Child ${t.slug} is itself a parent initiative; a parent holds initiatives, not other parents` });
+      continue;
+    }
     if (kind === null || kind === 'backlog') {
       notices.push({ level: 'warn', text: `Child initiative ${t.slug} has no folder yet` });
       continue;
     }
-    children.push(readV7Tree(dir, kind, `${sourceId}/${t.slug}`));
+    children.push(readV7Tree(dir, kind, `v7:${t.slug}`));
   }
   return board;
 }
