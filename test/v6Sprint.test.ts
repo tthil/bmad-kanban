@@ -113,3 +113,50 @@ describe('unknown status', () => {
     }
   });
 });
+
+describe('status keys that differ from epic-file keys', () => {
+  const cfg = fx('v6-keys');
+  const board = readV6Sprint(cfg, 'k');
+  const byKey = (k: string) => board.stories.find((s) => s.key === k);
+
+  it('joins on epic/story number and suffix, not the full key', () => {
+    expect(board.stories.map((s) => s.key)).toEqual([
+      '1-1-users-profile-settings',
+      '1-02-logout',
+      '1-3-größe-ändern',
+      '1-4-data-export',
+      '2-1-plant-data-model',
+      '2-1-plant-data-model-v2',
+      '2-2-watering-schedule',
+    ]);
+  });
+
+  it('takes the title from the epic file for an apostrophe/ampersand title', () => {
+    expect(byKey('1-1-users-profile-settings')).toMatchObject({ id: '1.1', title: "User's profile & settings", column: 'done' });
+  });
+
+  it('matches a zero-padded story number', () => {
+    expect(byKey('1-02-logout')).toMatchObject({ id: '1.2', title: 'Logout', column: 'review' });
+  });
+
+  it('matches a renamed / LLM-written key', () => {
+    expect(byKey('1-4-data-export')).toMatchObject({ id: '1.4', title: 'Export data', column: 'ready' });
+  });
+
+  it('falls back to full-key matching when two status keys share a prefix', () => {
+    expect(byKey('2-1-plant-data-model')).toMatchObject({ title: 'Plant data model', column: 'done' });
+    expect(byKey('2-1-plant-data-model-v2')).toMatchObject({ title: '2-1-plant-data-model-v2', column: 'backlog' });
+  });
+
+  it('keeps unmatched epic-file stories as backlog', () => {
+    expect(byKey('2-2-watering-schedule')).toMatchObject({ id: '2.2', title: 'Watering schedule', column: 'backlog', rawStatus: null });
+  });
+
+  it('resolves detail paths for non-ASCII keys', () => {
+    expect(v6SprintDetailPath(cfg, '1-3-größe-ändern')).toMatch(/1-3-größe-ändern\.md$/);
+    expect(v6SprintDetailPath(cfg, 'a/b')).toBeNull();
+    expect(v6SprintDetailPath(cfg, 'a\\b')).toBeNull();
+    expect(v6SprintDetailPath(cfg, 'a\0b')).toBeNull();
+    expect(v6SprintDetailPath(cfg, '.hidden')).toBeNull();
+  });
+});

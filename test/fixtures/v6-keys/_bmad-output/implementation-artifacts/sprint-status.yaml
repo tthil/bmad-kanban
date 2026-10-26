@@ -1,0 +1,9 @@
+development_status:
+  epic-1: in-progress
+  1-1-users-profile-settings: done
+  1-02-logout: review
+  1-3-größe-ändern: in-progress
+  1-4-data-export: ready-for-dev
+  epic-2: backlog
+  2-1-plant-data-model: done
+  2-1-plant-data-model-v2: backlog

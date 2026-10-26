@@ -12,7 +12,7 @@ const STORY_RE = /^#{2,4}\s*Story\s+(\d+)\.(\d+)([a-z]?)\s*:?\s*(.*?)\s*#*\s*$/i
 const FENCE_RE = /^\s{0,3}(?:```|~~~)/;
 const EPIC_KEY_RE = /^epic-(\d+)$/;
 const RETRO_KEY_RE = /^epic-(\d+)-retrospective$/;
-const STORY_KEY_RE = /^(\d+)-(\d+)([a-z]?)-.+/;
+const STORY_KEY_RE = /^(\d+)-(\d+)([a-z]?)-.+/i;
 
 const STATUS_FILE = 'sprint-status.yaml';
 
@@ -118,13 +118,14 @@ function readStatusMap(cfg: BmadConfig, notices: Notice[]): [string, unknown][] 
   return [];
 }
 
+const prefixOf = (epic: string, num: string, suffix: string): string =>
+  `${Number(epic)}-${Number(num)}${suffix.toLowerCase()}`;
+
 const rawOf = (v: unknown): string | null => (v === null || v === undefined ? null : String(v));
 
 export function readV6Sprint(cfg: BmadConfig, sourceId: string): Board {
   const notices: Notice[] = [];
   const planned = parseEpicFiles(epicFiles(cfg));
-  const titles = new Map(planned.stories.map((s) => [s.key, s]));
-
   const epicMap = new Map<string, Epic>();
   for (const [id, title] of planned.epics) epicMap.set(id, { id, title: title || `Epic ${id}` });
   const ensureEpic = (id: string): Epic => {
@@ -153,7 +154,26 @@ export function readV6Sprint(cfg: BmadConfig, sourceId: string): Board {
     have.add(key);
   };
 
-  for (const [key, value] of readStatusMap(cfg, notices)) {
+  // Join status keys to epic-file stories on (epic, story number, suffix): keys are often renamed,
+  // zero-padded or slugged differently. Only when two status keys share that prefix is the full key used.
+  const statusRows = readStatusMap(cfg, notices);
+  const prefixCount = new Map<string, number>();
+  for (const [key] of statusRows) {
+    const m = STORY_KEY_RE.exec(key);
+    if (m) {
+      const p = prefixOf(m[1]!, m[2]!, m[3]!);
+      prefixCount.set(p, (prefixCount.get(p) ?? 0) + 1);
+    }
+  }
+  const matched = new Set<PlannedStory>();
+  const findPlanned = (key: string, prefix: string): PlannedStory | undefined => {
+    const free = planned.stories.filter((s) => !matched.has(s));
+    const exact = free.find((s) => s.key === key);
+    if (exact || (prefixCount.get(prefix) ?? 0) > 1) return exact;
+    return free.find((s) => prefixOf(s.epic, String(s.num), s.suffix) === prefix);
+  };
+
+  for (const [key, value] of statusRows) {
     const raw = rawOf(value);
     let m: RegExpExecArray | null;
     if ((m = RETRO_KEY_RE.exec(key))) {
@@ -165,19 +185,22 @@ export function readV6Sprint(cfg: BmadConfig, sourceId: string): Board {
     } else if ((m = STORY_KEY_RE.exec(key))) {
       const epic = String(Number(m[1]));
       ensureEpic(epic);
-      addStory(key, epic, Number(m[2]), m[3], titles.get(key)?.title ?? key, raw);
+      const hit = findPlanned(key, prefixOf(m[1]!, m[2]!, m[3]!));
+      if (hit) matched.add(hit);
+      addStory(key, epic, Number(m[2]), m[3]!.toLowerCase(), hit?.title ?? key, raw);
     }
   }
 
   for (const s of planned.stories) {
-    if (!have.has(s.key)) addStory(s.key, s.epic, s.num, s.suffix, s.title, null);
+    if (!matched.has(s) && !have.has(s.key)) addStory(s.key, s.epic, s.num, s.suffix, s.title, null);
   }
 
   return { sourceId, kind: 'v6-sprint', label: 'v6 sprint', epics: [...epicMap.values()], stories, notices };
 }
 
 export function v6SprintDetailPath(cfg: BmadConfig, storyKey: string): string | null {
-  if (!/^[\w.-]+$/.test(storyKey) || storyKey.startsWith('.')) return null;
+  // Unicode slugs are valid keys; containment is re-checked against the real path by the caller.
+  if (storyKey === '' || storyKey.startsWith('.') || /[/\\\0]/.test(storyKey)) return null;
   const file = path.join(cfg.implementationArtifacts, `${storyKey}.md`);
   return isFile(file) ? file : null;
 }
