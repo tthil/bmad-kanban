@@ -4,7 +4,7 @@ type: story
 title: "Tax rules"
 parent: epic-pricing-rules
 covers: ["R2"]
-after: []
+after: [1]
 refined: true
 hitl: false
 risk: medium
