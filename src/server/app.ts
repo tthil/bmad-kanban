@@ -194,6 +194,7 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
       }
       const id = seg[2];
       if (id !== undefined && seg.length === 3 && method === 'DELETE') {
+        project(id);
         registry.remove(id);
         stopWatcher(id);
         broadcast('projects', {});

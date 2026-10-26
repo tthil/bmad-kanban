@@ -120,6 +120,39 @@ describe('server', () => {
     req.destroy();
   });
 
+  it('does not hang when a project has no output folders', async () => {
+    const dir = copyFixture('v6-sprint');
+    fs.rmSync(path.join(dir, '_bmad-output'), { recursive: true });
+    const { id } = await (await post(dir)).json();
+    const r = await fetch(`${base}/api/projects/${id}/boards/v6-sprint`, { signal: AbortSignal.timeout(3000) });
+    expect(r.status).toBe(404);
+  });
+
+  it('emits change when a malformed config is fixed', async () => {
+    const dir = copyFixture('v6-sprint');
+    const cfgFile = path.join(dir, '_bmad/config.toml');
+    const good = fs.readFileSync(cfgFile, 'utf8');
+    fs.writeFileSync(cfgFile, 'this is = = not toml [');
+    const { id } = await (await post(dir)).json();
+    await fetch(`${base}/api/projects/${id}/boards/v6-sprint`, { signal: AbortSignal.timeout(3000) });
+    const events: string[] = [];
+    const req = http.get(`${base}/api/events`, (res) => {
+      res.setEncoding('utf8');
+      res.on('data', (c: string) => events.push(...c.split('\n\n').filter((e) => e.startsWith('event: change'))));
+    });
+    await new Promise((r) => setTimeout(r, 100));
+    fs.writeFileSync(cfgFile, good);
+    const start = Date.now();
+    while (events.length === 0 && Date.now() - start < 2000) await new Promise((r) => setTimeout(r, 25));
+    await new Promise((r) => setTimeout(r, 600));
+    expect(events).toHaveLength(1);
+    req.destroy();
+  });
+
+  it('answers 404 when deleting an unknown project', async () => {
+    expect((await fetch(`${base}/api/projects/nope`, { method: 'DELETE' })).status).toBe(404);
+  });
+
   it('never resolves traversal story keys to files', async () => {
     const { id } = await (await post(copyFixture('v6-sprint'))).json();
     const r = await fetch(`${base}/api/projects/${id}/boards/v6-sprint/stories/..%2F..%2Fetc%2Fpasswd`);

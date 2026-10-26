@@ -10,6 +10,7 @@ const IGNORED = /(^|[\\/])(\.git|node_modules)([\\/]|$)/;
 /** Watch a project's BMAD folders; `onChange` fires once per debounced burst (300 ms). */
 export function watchProject(root: string, cfg: BmadConfig, onChange: () => void): Unwatch {
   const candidates = [
+    path.join(root, '_bmad'),
     cfg.outputFolder,
     cfg.planningArtifacts,
     cfg.implementationArtifacts,
@@ -32,7 +33,7 @@ export function watchProject(root: string, cfg: BmadConfig, onChange: () => void
   };
   watcher.on('all', fire);
   watcher.on('error', (e) => console.error('watch error:', e));
-  const ready = new Promise<void>((resolve) => watcher.once('ready', () => resolve()));
+  const ready = targets.length === 0 ? Promise.resolve() : new Promise<void>((resolve) => watcher.once('ready', () => resolve()));
   const stop = () => {
     closed = true;
     if (timer) clearTimeout(timer);
