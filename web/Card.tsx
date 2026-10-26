@@ -1,5 +1,6 @@
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Epic, Story } from '../src/model.js';
-import { epicColor } from './grouping.js';
+import { copyText, epicColor } from './grouping.js';
 
 export interface EpicInfo { epic: Epic; index: number }
 
@@ -14,18 +15,51 @@ export function EpicChip({ info }: { info: EpicInfo }) {
   );
 }
 
+function CopyButton({ story }: { story: Story }) {
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(copyText(story));
+      setState('copied');
+    } catch {
+      setState('failed');
+    }
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setState('idle'), 1500);
+  };
+
+  const label = state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed' : 'Copy';
+  return (
+    <button
+      type="button"
+      class={`card-copy${state !== 'idle' ? ` ${state}` : ''}`}
+      onClick={copy}
+      aria-label="Copy title"
+      title={`Copy "${copyText(story)}"`}
+    >
+      <span aria-live="polite">{label}</span>
+    </button>
+  );
+}
+
 export function Card(props: { story: Story; epic: EpicInfo | null; showEpic: boolean; onOpen: (s: Story) => void }) {
   const { story: s, epic } = props;
   return (
-    <button type="button" class={`card${s.column === 'dropped' ? ' dropped' : ''}`} onClick={() => props.onOpen(s)}>
-      <span class="card-top">
-        {props.showEpic && epic && <EpicChip info={epic} />}
-        <span class="card-id">{s.id}</span>
-        {s.blocked && <span class="badge blocked">blocked</span>}
-        {(s.type === 'spike' || s.type === 'bug') && <span class={`badge type-${s.type}`}>{s.type}</span>}
-      </span>
-      <span class="card-title">{s.title}</span>
-      {s.unknownStatus !== undefined && <span class="badge unknown">unknown status: {s.unknownStatus}</span>}
-    </button>
+    <div class="card-wrap">
+      <button type="button" class={`card${s.column === 'dropped' ? ' dropped' : ''}`} onClick={() => props.onOpen(s)}>
+        <span class="card-top">
+          {props.showEpic && epic && <EpicChip info={epic} />}
+          <span class="card-id">{s.id}</span>
+          {s.blocked && <span class="badge blocked">blocked</span>}
+          {(s.type === 'spike' || s.type === 'bug') && <span class={`badge type-${s.type}`}>{s.type}</span>}
+        </span>
+        <span class="card-title">{s.title}</span>
+        {s.unknownStatus !== undefined && <span class="badge unknown">unknown status: {s.unknownStatus}</span>}
+      </button>
+      <CopyButton story={s} />
+    </div>
   );
 }

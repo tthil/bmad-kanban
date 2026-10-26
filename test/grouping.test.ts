@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { loadBmadConfig } from '../src/bmad/config.js';
 import type { Board, Story } from '../src/model.js';
 import { readV6Sprint } from '../src/readers/v6Sprint.js';
-import { byColumn, epicColor, swimlanes } from '../web/grouping.js';
+import { byColumn, copyText, epicColor, swimlanes } from '../web/grouping.js';
 
 const story = (key: string, column: Story['column'], epicId: string | null = '1'): Story => ({
   key, id: key, title: key, epicId, column, rawStatus: column,
@@ -67,5 +67,19 @@ describe('epicColor', () => {
     expect(new Set(colors).size).toBe(8);
     expect(epicColor(8)).toBe(epicColor(0));
     expect(epicColor(-1)).toBe(epicColor(7));
+  });
+});
+
+describe('copyText', () => {
+  it('joins the display id and title', () => {
+    expect(copyText({ ...story('epic-pricing-rules/2', 'review'), id: '1.2', title: 'Tax rules' })).toBe('1.2 Tax rules');
+  });
+
+  it('uses the title alone when it already is the id', () => {
+    expect(copyText({ ...story('2-9-orphan-story', 'review'), id: '2.9', title: '2-9-orphan-story' })).toBe('2-9-orphan-story');
+  });
+
+  it('trims surrounding whitespace from the title', () => {
+    expect(copyText({ ...story('x', 'backlog'), id: '3', title: '  Only story \n' })).toBe('3 Only story');
   });
 });
