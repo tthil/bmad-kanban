@@ -30,4 +30,5 @@ export interface ProjectSummary {
   id: string; name: string; path: string; missing: boolean;
   tags: ('v6' | 'v7')[]; version: string | null;
   sources: SourceRef[]; defaultSourceId: string | null;
+  error?: string;
 }
