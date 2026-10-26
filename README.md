@@ -24,7 +24,7 @@ Options (`bmad-kanban --help`):
 - `--no-open`: do not open a browser
 - `[path]`: project folder (default: current directory)
 
-If a board is already running on that port, the new project is added to it instead of starting a second server.
+If a board is already running, the new project is added to it instead of starting a second server.
 
 Requirements: Node 22 or newer. `uv` is needed for full BMAD v7 fidelity (the board calls v7's own scripts through it). Without `uv` the board falls back to reading the files directly and shows a "reduced fidelity" notice.
 
