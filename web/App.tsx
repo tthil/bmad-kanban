@@ -141,6 +141,15 @@ export function App() {
       void refreshProjects();
     });
     es.addEventListener('projects', () => void refreshProjects());
+    // after a reconnect, events may have been missed: refetch everything shown
+    let connected = false;
+    es.addEventListener('open', () => {
+      if (connected) {
+        setBoardTick((t) => t + 1);
+        void refreshProjects();
+      }
+      connected = true;
+    });
     return () => es.close();
   }, [refreshProjects]);
 
