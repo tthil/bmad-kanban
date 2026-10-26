@@ -1,0 +1,26 @@
+{
+  "name": "bmad-kanban",
+  "version": "0.1.0",
+  "description": "Read-only local Kanban board for BMAD Method projects",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "bmad-kanban": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p . && vite build",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
