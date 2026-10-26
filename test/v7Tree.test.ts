@@ -76,6 +76,7 @@ describe('readV7Tree other kinds', () => {
   it('reads the backlog', () => {
     const b = readV7Tree(path.join(store, 'backlog'), 'backlog', 's');
     expect(b.kind).toBe('v7-backlog');
+    expect(b.label).toBe('Backlog');
     expect(b.stories).toHaveLength(1);
     expect(b.stories[0]).toMatchObject({
       key: 'backlog/bug-checkout-total',

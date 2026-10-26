@@ -99,7 +99,7 @@ function toBoard(doc: Obj, folder: string, kind: V7FolderKind, sourceId: string)
     if (!present(row.tracker_status) && m.unknownStatus !== undefined) story.unknownStatus = m.unknownStatus;
     stories.push(story);
   }
-  return { sourceId, kind: backlog ? 'v7-backlog' : 'v7-initiative', label: name, epics, stories, notices: [] };
+  return { sourceId, kind: backlog ? 'v7-backlog' : 'v7-initiative', label: backlog ? 'Backlog' : name, epics, stories, notices: [] };
 }
 
 async function toParent(

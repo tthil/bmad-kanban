@@ -286,7 +286,7 @@ function readInitiative(folder: string, sourceId: string): Board {
 function readBacklog(folder: string, sourceId: string): Board {
   const notices: Notice[] = [];
   const stories = buildRows(folder, [], notices, true).map((r) => toStory(r, path.basename(folder), null, true));
-  return { sourceId, kind: 'v7-backlog', label: path.basename(folder), epics: [], stories, notices };
+  return { sourceId, kind: 'v7-backlog', label: 'Backlog', epics: [], stories, notices };
 }
 
 function readParent(folder: string, sourceId: string): Board {

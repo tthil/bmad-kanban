@@ -82,6 +82,7 @@ describe('readV7 with an injected script runner', () => {
     const b = await readV7(cfg, dir, 'backlog', 's', run);
     expect(seen).toBe(dir);
     expect(b.kind).toBe('v7-backlog');
+    expect(b.label).toBe('Backlog');
     expect(b.stories[0]).toMatchObject({ key: 'backlog/bug-checkout-total', id: 'bug-checkout-total', column: 'ready', type: 'bug' });
   });
 
