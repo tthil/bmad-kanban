@@ -5,7 +5,7 @@ import { parse as parseToml } from 'smol-toml';
 import type { BmadConfig } from '../bmad/config.js';
 import type { Board, Epic, Notice, Story } from '../model.js';
 import { mapStatus, mapV7State } from '../status.js';
-import { listV7Folders, readV7Tree, type V7FolderKind } from './v7Tree.js';
+import { epicTitleFromFile, listV7Folders, readV7Tree, type V7FolderKind } from './v7Tree.js';
 
 export type RunScript = (
   cmd: string,
@@ -65,9 +65,15 @@ function toBoard(doc: Obj, folder: string, kind: V7FolderKind, sourceId: string)
   const epics: Epic[] = [];
   const idBySlug = new Map<string, string>();
   for (const e of Array.isArray(doc.epics) ? doc.epics : []) {
-    if (!isObj(e) || typeof e.slug !== 'string' || !present(e.id)) continue;
-    idBySlug.set(e.slug, String(e.id));
-    epics.push({ id: String(e.id), title: titles.get(e.slug) ?? e.slug });
+    if (!isObj(e) || typeof e.slug !== 'string') continue;
+    // An epic folder missing from tickets.toml has no id; the file reader keys it by slug.
+    const listed = present(e.id);
+    const id = listed ? String(e.id) : e.slug;
+    idBySlug.set(e.slug, id);
+    const title = listed
+      ? (titles.get(e.slug) ?? e.slug)
+      : epicTitleFromFile(path.join(folder, 'tickets', e.slug), e.slug);
+    epics.push({ id, title });
   }
   const stories: Story[] = [];
   for (const row of Array.isArray(doc.tickets) ? doc.tickets : []) {

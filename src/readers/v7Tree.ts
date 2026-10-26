@@ -215,7 +215,7 @@ export function listV7Folders(cfg: BmadConfig): { path: string; name: string; ki
   });
 }
 
-function epicTitleFromFile(epicFolder: string, slug: string): string {
+export function epicTitleFromFile(epicFolder: string, slug: string): string {
   const text = readText(path.join(epicFolder, `${slug}.md`));
   if (text !== null) {
     try {

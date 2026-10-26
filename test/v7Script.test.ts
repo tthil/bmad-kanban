@@ -1,4 +1,6 @@
 import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadBmadConfig } from '../src/bmad/config.js';
@@ -81,6 +83,26 @@ describe('readV7 with an injected script runner', () => {
     expect(seen).toBe(dir);
     expect(b.kind).toBe('v7-backlog');
     expect(b.stories[0]).toMatchObject({ key: 'backlog/bug-checkout-total', id: 'bug-checkout-total', column: 'ready', type: 'bug' });
+  });
+
+  it('keys an epic without an id by its slug, like the file reader', async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'v7s-'));
+    const init = path.join(tmp, 'init-x');
+    const epicDir = path.join(init, 'tickets', 'epic-x');
+    fs.mkdirSync(path.join(epicDir, 'tickets'), { recursive: true });
+    fs.mkdirSync(path.join(tmp, '_bmad', 'method', 'scripts'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, '_bmad', 'method', 'scripts', 'tickets.py'), '');
+    fs.writeFileSync(path.join(init, 'tickets', 'tickets.toml'), '');
+    fs.writeFileSync(path.join(epicDir, 'epic-x.md'), '---\ntitle: Unlisted epic\n---\n');
+    fs.writeFileSync(path.join(epicDir, 'tickets', 'tickets.toml'), '[[entry]]\nid = 1\ntype = "story"\ntitle = "One"\n');
+    const doc = { tickets: [row({ epic: 'epic-x', id: 1, title: 'One' })], epics: [{ slug: 'epic-x', id: null }] };
+    const b = await readV7({ ...cfg, root: tmp }, init, 'initiative', 's', ok(doc));
+    const f = readV7Tree(init, 'initiative', 's');
+    fs.rmSync(tmp, { recursive: true });
+    expect(b.epics).toEqual([{ id: 'epic-x', title: 'Unlisted epic' }]);
+    expect(b.epics).toEqual(f.epics);
+    expect(b.stories.map((x) => [x.key, x.id, x.epicId])).toEqual(f.stories.map((x) => [x.key, x.id, x.epicId]));
+    expect(b.stories[0].id).toBe('epic-x.1');
   });
 
   it('builds parent children as v7:<folder> and does not recurse into parents', async () => {
