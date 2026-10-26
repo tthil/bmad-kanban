@@ -119,10 +119,24 @@ describe('getStoryDetail', () => {
     expect(d.markdown).toContain('rounding per line');
   });
 
+  it('returns an empty detail without a path for a known story that has no file yet', async () => {
+    expect(await getStoryDetail(fx('v6-sprint'), 'v6-sprint', '1-2-password-reset')).toEqual({ path: null, markdown: '' });
+    expect(await getStoryDetail(fx('v6-keys'), 'v6-sprint', '2-2-watering-schedule')).toEqual({ path: null, markdown: '' });
+    expect(await getStoryDetail(fx('v6-spec'), 'v6-spec:spec-checkout', '3')).toEqual({ path: null, markdown: '' });
+  });
+
+  it('opens a story file with a non-ASCII key', async () => {
+    const d = await getStoryDetail(fx('v6-keys'), 'v6-sprint', '1-3-größe-ändern');
+    expect(d.path).toMatch(/1-3-größe-ändern\.md$/);
+    expect(d.markdown).toContain('# Größe ändern');
+  });
+
   it('throws for unknown stories and sources', async () => {
     await expect(getStoryDetail(fx('v7'), 'v7:initiative-flat', 'initiative-flat/99')).rejects.toBeInstanceOf(UnknownStoryError);
     await expect(getStoryDetail(fx('v6-sprint'), 'v6-sprint', '../x')).rejects.toBeInstanceOf(UnknownStoryError);
     await expect(getStoryDetail(fx('v6-sprint'), 'nope', 'x')).rejects.toBeInstanceOf(UnknownSourceError);
+    await expect(getStoryDetail(fx('v6-sprint'), 'v6-sprint', '9-9-not-on-board')).rejects.toBeInstanceOf(UnknownStoryError);
+    await expect(getStoryDetail(fx('v6-spec'), 'v6-spec:spec-checkout', '99')).rejects.toBeInstanceOf(UnknownStoryError);
   });
 
   it('refuses a file whose real path leaves the project root', async () => {

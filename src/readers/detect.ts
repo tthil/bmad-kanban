@@ -201,9 +201,15 @@ export async function getStoryDetail(root: string, sourceId: string, storyKey: s
         ? v6SpecDetailPath(t.path, storyKey)
         : v7DetailPath(t.path, storyKey);
   if (file === null) {
-    const text = t.type === 'v7' ? v7EntryText(t.path, storyKey) : null;
-    if (text === null) throw new UnknownStoryError(storyKey);
-    return { path: null, markdown: text };
+    if (t.type === 'v7') {
+      const text = v7EntryText(t.path, storyKey);
+      if (text === null) throw new UnknownStoryError(storyKey);
+      return { path: null, markdown: text };
+    }
+    // a story on the board whose file hasn't been written yet is not an error
+    const board = await loadBoard(cfg, t);
+    if (!board.stories.some((s) => s.key === storyKey)) throw new UnknownStoryError(storyKey);
+    return { path: null, markdown: '' };
   }
   if (!inside(cfg.root, file)) throw new UnknownStoryError(storyKey);
   return { path: file, markdown: fs.readFileSync(file, 'utf8') };
