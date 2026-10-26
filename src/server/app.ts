@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
-import { loadBmadConfig, type BmadConfig } from '../bmad/config.js';
 import type { ProjectSummary } from '../model.js';
 import { getStoryDetail, listSources, readBoard, UnknownSourceError, UnknownStoryError } from '../readers/detect.js';
 import { NotABmadProjectError, type ProjectPrefs, type Registry, type RegisteredProject } from '../registry.js';
@@ -58,18 +57,8 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
   const ensureWatcher = async (p: RegisteredProject): Promise<void> => {
     const existing = watchers.get(p.id);
     if (existing) return void (await existing.ready);
-    let cfg: BmadConfig;
-    try {
-      cfg = loadBmadConfig(p.path);
-    } catch {
-      cfg = {
-        root: p.path, outputFolder: path.join(p.path, '_bmad-output'),
-        planningArtifacts: path.join(p.path, '_bmad-output', 'planning-artifacts'),
-        implementationArtifacts: path.join(p.path, '_bmad-output', 'implementation-artifacts'),
-        activeInitiative: null, version: null,
-      };
-    }
-    const w = watchProject(p.path, cfg, () => {
+    if (isMissing(p)) return;
+    const w = watchProject(p.path, () => {
       const cur = registry.get(p.id);
       if (!cur) return stopWatcher(p.id);
       if (isMissing(cur)) stopWatcher(p.id);
@@ -77,6 +66,9 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
     });
     watchers.set(p.id, w);
     await w.ready;
+  };
+  const watchAll = async (): Promise<void> => {
+    await Promise.all(registry.list().map(ensureWatcher));
   };
 
   const sendJson = (res: http.ServerResponse, status: number, body?: unknown) => {
@@ -182,12 +174,14 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
 
     if (seg[1] === 'projects') {
       if (seg.length === 2 && method === 'GET') {
+        await watchAll(); // picks up projects whose folder came back
         return sendJson(res, 200, await Promise.all(registry.list().map(summarize)));
       }
       if (seg.length === 2 && method === 'POST') {
         const body = await readJson(req);
         if (typeof body.path !== 'string' || body.path === '') throw new HttpError(400, 'path is required');
         const added = registry.add(body.path);
+        await ensureWatcher(added);
         const summary = await summarize(added);
         broadcast('projects', {});
         return sendJson(res, 201, summary);
@@ -261,6 +255,7 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
       }
     }
     actualPort = (server.address() as AddressInfo).port;
+    await watchAll();
     return {
       port: actualPort,
       close: () =>

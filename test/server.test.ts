@@ -65,6 +65,22 @@ const hashTree = (dir: string): string => {
   return h.digest('hex');
 };
 
+
+/** Open the SSE stream and collect `change` events. */
+async function openEvents(): Promise<{ events: string[]; close: () => void }> {
+  const events: string[] = [];
+  const req = http.get(`${base}/api/events`, (res) => {
+    res.setEncoding('utf8');
+    res.on('data', (c: string) => events.push(...c.split('\n\n').filter((e) => e.startsWith('event: change'))));
+  });
+  await new Promise((r) => setTimeout(r, 100));
+  return { events, close: () => req.destroy() };
+}
+const waitFor = async (cond: () => boolean, ms = 2000): Promise<void> => {
+  const start = Date.now();
+  while (!cond() && Date.now() - start < ms) await new Promise((r) => setTimeout(r, 25));
+};
+
 describe('server', () => {
   it('adds a project and serves its board', async () => {
     const res = await post(copyFixture('v6-sprint'));
@@ -147,6 +163,64 @@ describe('server', () => {
     await new Promise((r) => setTimeout(r, 600));
     expect(events).toHaveLength(1);
     req.destroy();
+  });
+
+  it('live-refreshes a _bmad-only project when its output folder appears (no board GET)', async () => {
+    const dir = copyFixture('v6-sprint');
+    fs.rmSync(path.join(dir, '_bmad-output'), { recursive: true });
+    const { id, sources } = await (await post(dir)).json();
+    expect(sources).toEqual([]);
+    const sse = await openEvents();
+    fs.mkdirSync(path.join(dir, '_bmad-output/planning-artifacts'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '_bmad-output/planning-artifacts/epics.md'), '## Epic 1: A\n### Story 1.1: B\n');
+    await waitFor(() => sse.events.length > 0);
+    sse.close();
+    expect(sse.events.length).toBeGreaterThan(0);
+    expect(sse.events[0]).toContain(`"projectId":"${id}"`);
+    const [p] = await (await fetch(`${base}/api/projects`)).json();
+    expect(p.sources.map((s: { id: string }) => s.id)).toContain('v6-sprint');
+  });
+
+  it('follows a config change that moves the planning folder', async () => {
+    const dir = copyFixture('v6-sprint');
+    const { id } = await (await post(dir)).json();
+    const cfgFile = path.join(dir, '_bmad/config.toml');
+    fs.writeFileSync(cfgFile, fs.readFileSync(cfgFile, 'utf8').replace('_bmad-output/planning-artifacts', 'docs/plan'));
+    await new Promise((r) => setTimeout(r, 700));
+    const sse = await openEvents();
+    fs.mkdirSync(path.join(dir, 'docs/plan'), { recursive: true });
+    await new Promise((r) => setTimeout(r, 700));
+    sse.events.length = 0;
+    fs.writeFileSync(path.join(dir, 'docs/plan/epics.md'), '## Epic 7: Moved\n');
+    await waitFor(() => sse.events.length > 0);
+    sse.close();
+    expect(sse.events[0]).toContain(`"projectId":"${id}"`);
+  });
+
+  it('watches projects registered before the server started', async () => {
+    const dir = copyFixture('v6-sprint');
+    const reg = new Registry(path.join(tmp, 'pre.json'));
+    const { id } = reg.add(dir);
+    await server!.close();
+    server = await startServer({ registry: reg, port: 0, webRoot: path.join(tmp, 'web') });
+    base = `http://127.0.0.1:${server.port}`;
+    const sse = await openEvents();
+    fs.appendFileSync(path.join(dir, '_bmad-output/implementation-artifacts/sprint-status.yaml'), '# x\n');
+    await waitFor(() => sse.events.length > 0);
+    sse.close();
+    expect(sse.events[0]).toContain(`"projectId":"${id}"`);
+  });
+
+  it('still gets events for a project living under a node_modules path', async () => {
+    const dir = path.join(tmp, 'node_modules', 'proj');
+    fs.cpSync(path.join(fixtures, 'v6-sprint'), dir, { recursive: true });
+    const { id } = await (await post(dir)).json();
+    await fetch(`${base}/api/projects/${id}/boards/v6-sprint`);
+    const sse = await openEvents();
+    fs.appendFileSync(path.join(dir, '_bmad-output/implementation-artifacts/sprint-status.yaml'), '# x\n');
+    await waitFor(() => sse.events.length > 0);
+    sse.close();
+    expect(sse.events[0]).toContain(`"projectId":"${id}"`);
   });
 
   it('includes stored prefs in the project list', async () => {
