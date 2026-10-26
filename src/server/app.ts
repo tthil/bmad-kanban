@@ -30,7 +30,7 @@ const TYPES: Record<string, string> = {
 const isMissing = (p: RegisteredProject): boolean => !fs.existsSync(path.join(p.path, '_bmad'));
 
 async function summarize(p: RegisteredProject): Promise<ProjectSummary> {
-  const base = { id: p.id, name: p.name, path: p.path };
+  const base = { id: p.id, name: p.name, path: p.path, prefs: { ...p.prefs } };
   if (isMissing(p)) {
     return { ...base, missing: true, sources: [], tags: [], version: null, defaultSourceId: null };
   }

@@ -149,6 +149,15 @@ describe('server', () => {
     req.destroy();
   });
 
+  it('includes stored prefs in the project list', async () => {
+    const { id } = await (await post(copyFixture('v6-sprint'))).json();
+    const list = async () => (await (await fetch(`${base}/api/projects`)).json())[0];
+    expect((await list()).prefs).toEqual({ view: 'columns', showDropped: false, sourceId: null });
+    const body = JSON.stringify({ view: 'swimlanes', showDropped: true, sourceId: 'v6-sprint' });
+    expect((await fetch(`${base}/api/projects/${id}/prefs`, { method: 'PUT', headers: json, body })).status).toBe(204);
+    expect((await list()).prefs).toEqual({ view: 'swimlanes', showDropped: true, sourceId: 'v6-sprint' });
+  });
+
   it('answers 404 when deleting an unknown project', async () => {
     expect((await fetch(`${base}/api/projects/nope`, { method: 'DELETE' })).status).toBe(404);
   });

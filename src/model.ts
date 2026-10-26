@@ -26,9 +26,15 @@ export interface SourceRef {
   count: number; children?: SourceRef[];
 }
 export interface StoryDetail { path: string | null; markdown: string }
+export interface ProjectPrefs {
+  view: 'columns' | 'swimlanes';
+  showDropped: boolean;
+  sourceId: string | null;
+}
 export interface ProjectSummary {
   id: string; name: string; path: string; missing: boolean;
   tags: ('v6' | 'v7')[]; version: string | null;
   sources: SourceRef[]; defaultSourceId: string | null;
   error?: string;
+  prefs?: ProjectPrefs;
 }

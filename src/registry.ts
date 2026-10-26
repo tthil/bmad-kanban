@@ -4,11 +4,9 @@ import path from 'node:path';
 import envPaths from 'env-paths';
 import { findProjectRoot } from './bmad/config.js';
 
-export interface ProjectPrefs {
-  view: 'columns' | 'swimlanes';
-  showDropped: boolean;
-  sourceId: string | null;
-}
+import type { ProjectPrefs } from './model.js';
+
+export type { ProjectPrefs };
 
 export interface RegisteredProject {
   id: string;
