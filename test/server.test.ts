@@ -52,19 +52,23 @@ function rawGet(urlPath: string, host: string): Promise<{ status: number; body: 
   });
 }
 
+/** Hash every directory entry (dirs, files, symlinks) and file content under `dir`. */
 const hashTree = (dir: string): string => {
   const h = createHash('sha1');
   const walk = (d: string) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const f = path.join(d, e.name);
-      if (e.isDirectory()) walk(f);
-      else h.update(path.relative(dir, f)).update(fs.readFileSync(f));
+      const rel = path.relative(dir, f);
+      if (e.isSymbolicLink()) h.update(`l:${rel}->${fs.readlinkSync(f)}\0`);
+      else if (e.isDirectory()) {
+        h.update(`d:${rel}\0`);
+        walk(f);
+      } else h.update(`f:${rel}\0`).update(fs.readFileSync(f)).update('\0');
     }
   };
   walk(dir);
   return h.digest('hex');
 };
-
 
 /** Open the SSE stream and collect `change` events. */
 async function openEvents(): Promise<{ events: string[]; close: () => void }> {
@@ -272,15 +276,34 @@ describe('server', () => {
     expect(await r.text()).toBe('web app not built');
   });
 
-  it('is read-only: GET routes leave the fixture untouched', async () => {
-    const dir = copyFixture('v6-sprint');
-    const before = hashTree(dir);
-    const { id } = await (await post(dir)).json();
-    await fetch(`${base}/api/projects`);
+  it('is read-only: a full run over every fixture leaves them untouched', async () => {
+    const root = path.join(tmp, 'all');
+    fs.cpSync(fixtures, root, { recursive: true });
+    const before = hashTree(root);
+    const enc = encodeURIComponent;
+    let boards = 0;
+    let details = 0;
+    for (const name of fs.readdirSync(root).sort()) {
+      const res = await post(path.join(root, name));
+      expect(res.status, name).toBe(201);
+      const { id } = await res.json();
+      const [summary] = (await (await fetch(`${base}/api/projects`)).json()).filter((p: { id: string }) => p.id === id);
+      const refs = (summary.sources as { id: string; children?: { id: string }[] }[]).flatMap((r) => [r, ...(r.children ?? [])]);
+      for (const ref of refs) {
+        const board = await (await fetch(`${base}/api/projects/${id}/boards/${enc(ref.id)}`)).json();
+        boards++;
+        const story = [board, ...(board.children ?? [])].flatMap((b: { stories: { key: string }[] }) => b.stories)[0];
+        if (story) {
+          await fetch(`${base}/api/projects/${id}/boards/${enc(ref.id)}/stories/${enc(story.key)}`);
+          details++;
+        }
+        await fetch(`${base}/api/projects/${id}/boards/${enc(ref.id)}/stories/..%2F..%2Fx`);
+      }
+      await fetch(`${base}/api/projects/${id}/boards/v6-sprint`);
+    }
     await fetch(`${base}/api/state`);
-    await fetch(`${base}/api/projects/${id}/boards/v6-sprint`);
-    await fetch(`${base}/api/projects/${id}/boards/v6-sprint/stories/1-1-user-login`);
-    await fetch(`${base}/api/projects/${id}/boards/v6-sprint/stories/..%2F..%2Fx`);
-    expect(hashTree(dir)).toBe(before);
-  });
+    expect(boards).toBeGreaterThan(8);
+    expect(details).toBeGreaterThan(5);
+    expect(hashTree(root)).toBe(before);
+  }, 60_000);
 });
