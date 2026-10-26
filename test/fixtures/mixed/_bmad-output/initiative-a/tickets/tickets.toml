@@ -1,0 +1,10 @@
+[[entry]]
+id = 1
+type = "story"
+title = "Only story"
+description = "The one story of a flat initiative."
+verify = "The story works on the deployed site."
+covers = []
+after = []
+hitl = false
+risk = "low"
