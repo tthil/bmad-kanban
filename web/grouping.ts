@@ -49,3 +49,9 @@ export function epicColor(index: number): string {
   const n = PALETTE.length;
   return PALETTE[((index % n) + n) % n]!;
 }
+
+/** The text a card's copy button puts on the clipboard: `<id> <title>`, or the title alone when it is the story key. */
+export function copyText(story: Story): string {
+  const title = story.title.trim();
+  return title === story.key ? title : `${story.id} ${title}`;
+}

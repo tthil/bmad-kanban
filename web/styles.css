@@ -168,6 +168,18 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
   display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left; padding: 7px 8px; margin-bottom: 6px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow);
 }
+.card-wrap { position: relative; margin-bottom: 6px; }
+.card-wrap:last-child { margin-bottom: 0; }
+.card-wrap .card { margin-bottom: 0; padding-right: 48px; }
+.card-copy {
+  position: absolute; top: 5px; right: 5px; font-size: 11px; padding: 1px 6px; border-radius: 4px;
+  color: var(--muted); background: var(--surface); border: 1px solid var(--border); opacity: 0;
+}
+.card-wrap:hover .card-copy, .card-copy:focus-visible, .card-copy.copied, .card-copy.failed { opacity: 1; }
+.card-copy:hover { color: var(--accent); border-color: var(--accent); }
+.card-copy.copied { color: var(--accent); border-color: var(--accent); }
+.card-copy.failed { color: #dc2626; border-color: #dc2626; }
+@media (hover: none) { .card-copy { opacity: 1; } }
 .card:last-child { margin-bottom: 0; }
 .card:hover { border-color: var(--accent); }
 .card.dropped { opacity: 0.6; }

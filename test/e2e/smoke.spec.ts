@@ -108,3 +108,16 @@ test('refetches the board after the event stream reconnects', async ({ page }) =
 
   await expect(page.getByRole('region', { name: 'Review' }).getByRole('button', { name: plant })).toBeVisible({ timeout: 15_000 });
 });
+
+test('copies a card\'s id and title to the clipboard', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(base).origin });
+  await page.goto(base);
+  await page.getByRole('navigation', { name: 'Projects' }).getByRole('button', { name: /v6 sprint/ }).click();
+
+  const card = page.locator('.card-wrap', { has: page.getByRole('button', { name: /User login/ }) });
+  await card.hover();
+  await card.getByRole('button', { name: 'Copy title' }).click();
+  await expect(card.getByRole('button', { name: 'Copy title' })).toHaveText('Copied');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('1.1 User login');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
