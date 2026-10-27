@@ -47,18 +47,25 @@ function CopyButton({ story }: { story: Story }) {
 
 export function Card(props: { story: Story; epic: EpicInfo | null; showEpic: boolean; onOpen: (s: Story) => void }) {
   const { story: s, epic } = props;
+  const cls = `card${s.column === 'dropped' ? ' dropped' : ''}${s.noFile ? ' no-file' : ''}`;
+  const body = (
+    <>
+      <span class="card-top">
+        {props.showEpic && epic && <EpicChip info={epic} />}
+        <span class="card-id">{s.id}</span>
+        {s.blocked && <span class="badge blocked">blocked</span>}
+        {(s.type === 'spike' || s.type === 'bug') && <span class={`badge type-${s.type}`}>{s.type}</span>}
+      </span>
+      <span class="card-title">{s.title}</span>
+      {s.unknownStatus !== undefined && <span class="badge unknown">unknown status: {s.unknownStatus}</span>}
+      {s.noFile && <span class="card-nofile">No file yet</span>}
+    </>
+  );
   return (
     <div class="card-wrap">
-      <button type="button" class={`card${s.column === 'dropped' ? ' dropped' : ''}`} onClick={() => props.onOpen(s)}>
-        <span class="card-top">
-          {props.showEpic && epic && <EpicChip info={epic} />}
-          <span class="card-id">{s.id}</span>
-          {s.blocked && <span class="badge blocked">blocked</span>}
-          {(s.type === 'spike' || s.type === 'bug') && <span class={`badge type-${s.type}`}>{s.type}</span>}
-        </span>
-        <span class="card-title">{s.title}</span>
-        {s.unknownStatus !== undefined && <span class="badge unknown">unknown status: {s.unknownStatus}</span>}
-      </button>
+      {s.noFile
+        ? <div class={cls}>{body}</div>
+        : <button type="button" class={cls} onClick={() => props.onOpen(s)}>{body}</button>}
       <CopyButton story={s} />
     </div>
   );

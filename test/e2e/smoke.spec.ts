@@ -79,17 +79,22 @@ test('mixed project: tags, boards, swimlanes, detail and live update', async ({ 
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 
-  // a story on the board without a file yet: "No file yet", no error
-  await page.getByRole('button', { name: /Password reset/i }).click();
-  await expect(dialog.getByText('No file yet')).toBeVisible();
-  await expect(dialog.locator('.notice.error')).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-
+  // a story on the board without a file yet says so on the card and does not open
   const reset = /Password reset/i;
-  await expect(page.getByRole('region', { name: 'In progress' }).getByRole('button', { name: reset })).toBeVisible();
+  const resetCard = page.locator('.card-wrap', { hasText: reset });
+  await expect(page.getByRole('region', { name: 'In progress' }).locator('.card-wrap', { hasText: reset })).toBeVisible();
+  await expect(resetCard.getByText('No file yet')).toBeVisible();
+  await expect(resetCard.getByRole('button', { name: reset })).toHaveCount(0);
+  await resetCard.getByText(reset).click();
+  await expect(dialog).toHaveCount(0);
+
   fs.writeFileSync(statusFile, fs.readFileSync(statusFile, 'utf8').replace('1-2-password-reset: contexted', '1-2-password-reset: done'));
+  await expect(done.locator('.card-wrap', { hasText: reset })).toBeVisible({ timeout: 3000 });
+
+  // once the story file is written, the card opens
+  fs.writeFileSync(path.join(path.dirname(statusFile), '1-2-password-reset.md'), '# Story 1.2: Password reset\n');
   await expect(done.getByRole('button', { name: reset })).toBeVisible({ timeout: 3000 });
+  await expect(resetCard.getByText('No file yet')).toHaveCount(0);
 });
 
 test('refetches the board after the event stream reconnects', async ({ page }) => {
@@ -97,7 +102,7 @@ test('refetches the board after the event stream reconnects', async ({ page }) =
   const sidebar = page.getByRole('navigation', { name: 'Projects' });
   await sidebar.getByRole('button', { name: /v6 sprint/ }).click();
   const plant = /Plant data model/;
-  await expect(page.getByRole('region', { name: 'Ready' }).getByRole('button', { name: plant })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Ready' }).locator('.card-wrap', { hasText: plant })).toBeVisible();
 
   // the server goes away; the change happens while no watcher is running
   const exited = new Promise((r) => child.once('exit', r));
@@ -106,7 +111,7 @@ test('refetches the board after the event stream reconnects', async ({ page }) =
   fs.writeFileSync(statusFile, fs.readFileSync(statusFile, 'utf8').replace('2-1-plant-data-model: ready-for-dev', '2-1-plant-data-model: review'));
   base = await startCli();
 
-  await expect(page.getByRole('region', { name: 'Review' }).getByRole('button', { name: plant })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('region', { name: 'Review' }).locator('.card-wrap', { hasText: plant })).toBeVisible({ timeout: 15_000 });
 });
 
 test('copies a card\'s id and title to the clipboard', async ({ page, context }) => {

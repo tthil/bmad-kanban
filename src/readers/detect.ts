@@ -162,7 +162,7 @@ export async function readBoard(root: string, sourceId: string): Promise<Board> 
   const t = resolveTarget(cfg, sourceId);
   if (t === null) throw new UnknownSourceError(sourceId);
   try {
-    return await loadBoard(cfg, t);
+    return markNoFile(cfg, t, await loadBoard(cfg, t));
   } catch (e) {
     return {
       sourceId,
@@ -185,6 +185,28 @@ function inside(root: string, file: string): boolean {
   }
 }
 
+function detailFile(cfg: BmadConfig, t: Target, storyKey: string): string | null {
+  return t.type === 'v6-sprint'
+    ? v6SprintDetailPath(cfg, storyKey)
+    : t.type === 'v6-spec'
+      ? v6SpecDetailPath(t.path, storyKey)
+      : v7DetailPath(t.path, storyKey);
+}
+
+/** Flag stories with nothing to read: no story/plan file and, for v7, no description in tickets.toml. */
+function markNoFile(cfg: BmadConfig, t: Target, board: Board): Board {
+  for (const s of board.stories) {
+    const file = detailFile(cfg, t, s.key);
+    const readable = file !== null ? inside(cfg.root, file) : t.type === 'v7' && v7EntryText(t.path, s.key) !== null;
+    if (!readable) s.noFile = true;
+  }
+  for (const c of board.children ?? []) {
+    const ct = resolveTarget(cfg, c.sourceId);
+    if (ct !== null) markNoFile(cfg, ct, c);
+  }
+  return board;
+}
+
 export async function getStoryDetail(root: string, sourceId: string, storyKey: string): Promise<StoryDetail> {
   let cfg: BmadConfig;
   try {
@@ -194,12 +216,7 @@ export async function getStoryDetail(root: string, sourceId: string, storyKey: s
   }
   const t = resolveTarget(cfg, sourceId);
   if (t === null) throw new UnknownSourceError(sourceId);
-  const file =
-    t.type === 'v6-sprint'
-      ? v6SprintDetailPath(cfg, storyKey)
-      : t.type === 'v6-spec'
-        ? v6SpecDetailPath(t.path, storyKey)
-        : v7DetailPath(t.path, storyKey);
+  const file = detailFile(cfg, t, storyKey);
   if (file === null) {
     if (t.type === 'v7') {
       const text = v7EntryText(t.path, storyKey);

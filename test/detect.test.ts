@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getStoryDetail, listSources, readBoard, UnknownSourceError, UnknownStoryError } from '../src/readers/detect.js';
+import type { Board } from '../src/model.js';
 
 const boom = vi.hoisted(() => ({ on: false }));
 vi.mock('../src/readers/v6Sprint.js', async (orig) => {
@@ -87,6 +88,16 @@ describe('readBoard', () => {
     expect(child.sourceId).toBe('v7:initiative-checkout');
     expect(child.stories.length).toBeGreaterThan(0);
     expect((await readBoard(fx('v7'), 'v7-backlog')).kind).toBe('v7-backlog');
+  });
+
+  it('flags stories that have nothing to open', async () => {
+    const none = (b: Board) => b.stories.filter((s) => s.noFile).map((s) => s.key);
+    expect(none(await readBoard(fx('v6-sprint'), 'v6-sprint'))).toEqual(['1-2-password-reset', '2-1-plant-data-model', '2-9-orphan-story']);
+    expect(none(await readBoard(fx('v6-spec'), 'v6-spec:spec-checkout'))).toEqual(['3']);
+    // epic-pricing-rules/3 has no plan file but a tickets.toml description, so it still opens
+    expect(none(await readBoard(fx('v7'), 'v7:initiative-checkout'))).toEqual([]);
+    const parent = await readBoard(fx('v7'), 'v7:initiative-parent');
+    expect(parent.children!.flatMap(none)).toEqual([]);
   });
 
   it('throws UnknownSourceError for unknown ids', async () => {
