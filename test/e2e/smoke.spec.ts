@@ -79,11 +79,12 @@ test('mixed project: tags, boards, swimlanes, detail and live update', async ({ 
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 
-  // a story on the board without a file yet says so on the card and does not open
+  // a story with a file shows the file icon; one without a file has none and does not open
   const reset = /Password reset/i;
   const resetCard = page.locator('.card-wrap', { hasText: reset });
   await expect(page.getByRole('region', { name: 'In progress' }).locator('.card-wrap', { hasText: reset })).toBeVisible();
-  await expect(resetCard.getByText('No file yet')).toBeVisible();
+  await expect(page.locator('.card-wrap', { hasText: /User login/ }).getByRole('img', { name: 'has story file' })).toBeVisible();
+  await expect(resetCard.getByRole('img', { name: 'has story file' })).toHaveCount(0);
   await expect(resetCard.getByRole('button', { name: reset })).toHaveCount(0);
   await resetCard.getByText(reset).click();
   await expect(dialog).toHaveCount(0);
@@ -94,7 +95,7 @@ test('mixed project: tags, boards, swimlanes, detail and live update', async ({ 
   // once the story file is written, the card opens
   fs.writeFileSync(path.join(path.dirname(statusFile), '1-2-password-reset.md'), '# Story 1.2: Password reset\n');
   await expect(done.getByRole('button', { name: reset })).toBeVisible({ timeout: 3000 });
-  await expect(resetCard.getByText('No file yet')).toHaveCount(0);
+  await expect(resetCard.getByRole('img', { name: 'has story file' })).toBeVisible();
 });
 
 test('refetches the board after the event stream reconnects', async ({ page }) => {
