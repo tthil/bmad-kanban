@@ -15,6 +15,15 @@ export function EpicChip({ info }: { info: EpicInfo }) {
   );
 }
 
+function FileIcon() {
+  return (
+    <svg class="card-file" viewBox="0 0 16 16" width="13" height="13" role="img" aria-label="has story file">
+      <title>Has a story file</title>
+      <path d="M4 1.5h5L12.5 5v9.5h-8.5z M9 1.5V5h3.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+    </svg>
+  );
+}
+
 function CopyButton({ story }: { story: Story }) {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -53,12 +62,12 @@ export function Card(props: { story: Story; epic: EpicInfo | null; showEpic: boo
       <span class="card-top">
         {props.showEpic && epic && <EpicChip info={epic} />}
         <span class="card-id">{s.id}</span>
+        {!s.noFile && <FileIcon />}
         {s.blocked && <span class="badge blocked">blocked</span>}
         {(s.type === 'spike' || s.type === 'bug') && <span class={`badge type-${s.type}`}>{s.type}</span>}
       </span>
       <span class="card-title">{s.title}</span>
       {s.unknownStatus !== undefined && <span class="badge unknown">unknown status: {s.unknownStatus}</span>}
-      {s.noFile && <span class="card-nofile">No file yet</span>}
     </>
   );
   return (

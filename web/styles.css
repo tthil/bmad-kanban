@@ -183,10 +183,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .card:last-child { margin-bottom: 0; }
 .card:hover { border-color: var(--accent); }
 .card.dropped { opacity: 0.6; }
-.card.no-file { background: transparent; border-style: dashed; box-shadow: none; cursor: default; }
+.card.no-file { cursor: default; }
 .card.no-file:hover { border-color: var(--border); }
-.card.no-file .card-title { color: var(--muted); }
-.card-nofile { font-size: 11px; font-style: italic; color: var(--muted); }
+.card-file { flex: none; color: var(--accent); }
 .card.dropped .card-title { text-decoration: line-through; }
 .card-top { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .card-id { font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
