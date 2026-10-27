@@ -1,6 +1,6 @@
 # bmad-kanban
 
-A read-only Kanban board for [BMAD Method](https://github.com/bmad-code-org/BMAD-METHOD) projects. It runs locally, reads your project's BMAD files, and shows stories as cards in Backlog, Ready, In progress, Review and Done columns, with optional epic swimlanes. It updates live when files change. Click a card to read its story; hover a card and click **Copy** to put its id and title (e.g. `1.2 Tax rules`) on the clipboard, ready to paste into your BMAD agent.
+A read-only Kanban board for [BMAD Method](https://github.com/bmad-code-org/BMAD-METHOD) projects. It runs locally, reads your project's BMAD files, and shows stories as cards in Backlog, Ready, In progress, Review and Done columns, with optional epic swimlanes. It updates live when files change. Click a card to read its story (cards with a dashed border say "No file yet" and have nothing to open); hover a card and click **Copy** to put its id and title (e.g. `1.2 Tax rules`) on the clipboard, ready to paste into your BMAD agent.
 
 It never writes to your project. Remove a project from the sidebar and only the board's own list changes; your folder is not touched.
 

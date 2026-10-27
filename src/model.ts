@@ -12,6 +12,7 @@ export interface Story {
   unknownStatus?: string;
   blocked?: boolean;
   type?: 'story' | 'spike' | 'bug';
+  noFile?: true;          // nothing to open: no story/plan file (or v7 description) yet
 }
 export interface Notice { level: 'info' | 'warn' | 'error'; text: string }
 export interface Board {
