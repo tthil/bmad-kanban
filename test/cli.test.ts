@@ -104,6 +104,33 @@ describe('cli', () => {
     expect(open).not.toHaveBeenCalled();
   });
 
+  it('--browser picks the browser, BMAD_KANBAN_BROWSER sets the default', async () => {
+    const open = vi.fn(async () => undefined);
+    await main([fixture, '--port', '0', '--browser', 'firefox'], { ...io(), open, startServer: realStart });
+    expect(open.mock.calls[0]![1]).toBe('firefox');
+    process.env.BMAD_KANBAN_BROWSER = 'safari';
+    try {
+      await main([fixture], { ...io(), open, startServer: realStart });
+      expect(open.mock.calls[1]![1]).toBe('safari');
+      await main([fixture, '--browser', 'chrome'], { ...io(), open, startServer: realStart });
+      expect(open.mock.calls[2]![1]).toBe('chrome'); // the flag wins
+    } finally {
+      delete process.env.BMAD_KANBAN_BROWSER;
+    }
+    await main([fixture], { ...io(), open, startServer: realStart });
+    expect(open.mock.calls[3]![1]).toBeUndefined(); // system browser
+  });
+
+  it('a browser that cannot be opened still prints the address', async () => {
+    const open = vi.fn(async () => {
+      throw new Error('app not found');
+    });
+    const code = await main([fixture, '--port', '0', '--browser', 'nope'], { ...io(), open, startServer: realStart });
+    expect(code).toBe(0);
+    expect(err.join('')).toContain('Could not open nope: app not found.');
+    expect(out.join('')).toMatch(/BMAD Kanban running at http:\/\/127\.0\.0\.1:\d+\/\?project=\w+#token=/);
+  });
+
   it('--version and --help', async () => {
     expect(await main(['--version'], io())).toBe(0);
     expect(out.join('')).toMatch(/^\d+\.\d+\.\d+/);
