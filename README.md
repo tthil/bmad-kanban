@@ -71,7 +71,13 @@ npm run test:e2e  # Playwright smoke test; run the build first
 1. `npm version <patch|minor|major>` and `git push --follow-tags`.
 2. Create a GitHub release for the new tag (`gh release create vX.Y.Z`).
 
-Publishing the release runs `.github/workflows/release.yml`, which tests the package and publishes it to npm with a provenance statement. It uses npm trusted publishing, so there is no npm token to manage. Don't run `npm publish` locally.
+3. Approve the staged version on npmjs.com (or `npm stage list` then `npm stage approve <id>`); this asks for your 2FA.
+
+Publishing the release runs `.github/workflows/release.yml`, which tests the package and *stages* it on npm through trusted publishing, so there is no npm token to manage. A staged version is not public until a maintainer approves it, so nothing reaches npm without the maintainer's 2FA. Don't run `npm publish` locally.
+
+## Contributing
+
+Contributions are welcome as pull requests. CI must pass, and the maintainer reviews and merges every change; releases to npm are made by the maintainer only.
 
 ## Acknowledgements
 

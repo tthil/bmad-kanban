@@ -1,8 +1,8 @@
 name: Release
 
-# Publishes to npm when a GitHub release is published. Uses npm trusted
-# publishing (OIDC), so there is no npm token, and the package gets a
-# provenance statement linking it to this workflow run.
+# Stages the package on npm when a GitHub release is published. Uses npm
+# trusted publishing (OIDC), so there is no npm token. A staged version is not
+# public: a maintainer approves it on npmjs.com (with 2FA) to publish it.
 on:
   release:
     types: [published]
@@ -24,11 +24,11 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
-      # trusted publishing needs npm 11.5.1 or newer
-      - run: npm install -g npm@^11.5.1
+      # staged publishing needs npm 11.17 or newer
+      - run: npm install -g npm@^11.17.0
       - run: npm ci
       - name: Check the tag matches package.json
         run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
       - run: npm run typecheck
       # prepublishOnly builds and runs the unit tests
-      - run: npm publish --provenance --access public
+      - run: npm stage publish --provenance
