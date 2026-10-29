@@ -272,14 +272,35 @@ describe('server', () => {
     expect(esc.body).toBe('<html>app</html>');
   });
 
-  it('requires the access token on every API route', async () => {
+  it('works from any browser without a token', async () => {
     const bare = (u: string, init?: RequestInit) => globalThis.fetch(`${base}${u}`, init);
-    expect((await bare('/api/projects')).status).toBe(401);
-    expect((await bare('/api/state', { headers: { Authorization: 'Bearer wrong' } })).status).toBe(401);
-    expect((await bare(`/api/projects?token=${server!.token}`)).status).toBe(401); // the query only works for events
-    expect((await bare('/api/events')).status).toBe(401);
-    expect((await bare('/api/projects', { method: 'POST', headers: json, body: '{"path":"/"}' })).status).toBe(401);
-    expect((await bare('/')).status).toBe(200); // the web app itself needs no token
+    expect((await bare('/api/projects')).status).toBe(200);
+    expect((await bare('/api/state')).status).toBe(200);
+    const added = await bare('/api/projects', { method: 'POST', headers: json, body: JSON.stringify({ path: copyFixture('v6-sprint') }) });
+    expect(added.status).toBe(201);
+    const { id } = await added.json();
+    expect((await bare(`/api/projects/${id}/boards/v6-sprint`)).status).toBe(200);
+    const events = new AbortController();
+    expect((await bare('/api/events', { signal: events.signal })).status).toBe(200);
+    events.abort();
+    expect((await bare(`/api/projects/${id}`, { method: 'DELETE' })).status).toBe(204);
+  });
+
+  it('never runs the scripts of a project added without the token, until the token trusts it', async () => {
+    const dir = copyFixture('v7');
+    const marker = path.join(tmp, 'script-ran');
+    fs.writeFileSync(path.join(dir, '_bmad', 'method', 'scripts', 'tickets.py'), `open(${JSON.stringify(marker)}, "w").close()\n`);
+    const add = (headers: Record<string, string>) =>
+      globalThis.fetch(`${base}/api/projects`, { method: 'POST', headers: { ...json, ...headers }, body: JSON.stringify({ path: dir }) });
+
+    const untrusted = await (await add({})).json();
+    expect(untrusted.trusted).toBe(false);
+    expect((await (await add({ Authorization: 'Bearer wrong' })).json()).trusted).toBe(false);
+    const board = await (await globalThis.fetch(`${base}/api/projects/${untrusted.id}/boards/${encodeURIComponent('v7:initiative-parent')}`)).json();
+    expect((board.notices as { text: string }[]).some((n) => n.text.includes('added from the browser'))).toBe(true);
+    expect(fs.existsSync(marker)).toBe(false);
+
+    expect((await (await add({ Authorization: `Bearer ${server!.token}` })).json()).trusted).toBe(true);
   });
 
   it('answers the hello challenge without a token, proving it holds one', async () => {

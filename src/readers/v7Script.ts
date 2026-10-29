@@ -24,9 +24,9 @@ const SCRIPTS_OFF =
   'Read directly from the ticket files: scripts are turned off (--no-scripts), so prerequisites, "next" ordering and tracker status are not applied.';
 
 /** The file reader's notices, reworded for a board whose scripts were turned off rather than missing. */
-function scriptsOff(b: Board): Board {
-  b.notices = b.notices.map((n) => (n.text === REDUCED ? { ...n, text: SCRIPTS_OFF } : n));
-  b.children?.forEach(scriptsOff);
+function scriptsOff(b: Board, text: string): Board {
+  b.notices = b.notices.map((n) => (n.text === REDUCED ? { ...n, text } : n));
+  b.children?.forEach((c) => scriptsOff(c, text));
   return b;
 }
 
@@ -144,9 +144,10 @@ export async function readV7(
   kind: V7FolderKind,
   sourceId: string,
   run: RunScript | null = runScript,
+  offNotice: string = SCRIPTS_OFF,
 ): Promise<Board> {
-  // null: the project's scripts must not run (--no-scripts)
-  if (run === null) return scriptsOff(readV7Tree(folder, kind, sourceId));
+  // null: the project's scripts must not run; `offNotice` says why
+  if (run === null) return scriptsOff(readV7Tree(folder, kind, sourceId), offNotice);
   const script = path.join(cfg.root, '_bmad', 'method', 'scripts', 'tickets.py');
   if (!fs.existsSync(script)) return readV7Tree(folder, kind, sourceId);
   try {

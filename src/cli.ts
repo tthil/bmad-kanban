@@ -156,11 +156,12 @@ export async function main(argv: string[], deps: Partial<CliDeps> = {}): Promise
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ path: root }),
     });
-    const body = (await res.json().catch(() => ({}))) as { id?: string; name?: string; error?: string };
+    const body = (await res.json().catch(() => ({}))) as { id?: string; name?: string; error?: string; trusted?: boolean };
     if (!res.ok || !body.id) {
       d.stderr(`Could not add project: ${body.error ?? res.statusText}\n`);
       return 1;
     }
+    if (body.trusted === false) d.stderr(`${root} is not trusted by the running board, so its scripts will not run.\n`);
     url = `${base}?project=${body.id}`;
     name = body.name ?? path.basename(root);
   }
