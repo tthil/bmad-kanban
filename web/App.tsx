@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import type { Board, Epic, ProjectPrefs, ProjectSummary, SourceRef, Story } from '../src/model.js';
-import { api, ApiError } from './api.js';
+import { api, ApiError, eventsUrl } from './api.js';
 import { EpicChip } from './Card.js';
 import { CardDetail } from './CardDetail.js';
 import { ColumnsView } from './ColumnsView.js';
@@ -129,7 +129,7 @@ export function App() {
 
   // live refresh
   useEffect(() => {
-    const es = new EventSource('/api/events');
+    const es = new EventSource(eventsUrl);
     es.addEventListener('change', (ev) => {
       try {
         const { projectId } = JSON.parse((ev as MessageEvent<string>).data) as { projectId?: string };

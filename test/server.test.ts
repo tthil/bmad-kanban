@@ -33,6 +33,9 @@ const copyFixture = (name: string): string => {
   fs.cpSync(path.join(fixtures, name), dest, { recursive: true });
   return dest;
 };
+// every API call in these tests carries the server's token unless it sets its own Authorization
+const fetch = (url: string, init: RequestInit = {}) =>
+  globalThis.fetch(url, { ...init, headers: { Authorization: `Bearer ${server!.token}`, ...init.headers } });
 const json = { 'Content-Type': 'application/json' };
 const post = (p: string) =>
   fetch(`${base}/api/projects`, { method: 'POST', headers: json, body: JSON.stringify({ path: p }) });
@@ -40,7 +43,7 @@ const post = (p: string) =>
 function rawGet(urlPath: string, host: string): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const req = http.request(
-      { host: '127.0.0.1', port: server!.port, path: urlPath, headers: { Host: host } },
+      { host: '127.0.0.1', port: server!.port, path: urlPath, headers: { Host: host, Authorization: `Bearer ${server!.token}` } },
       (res) => {
         let body = '';
         res.on('data', (c) => (body += c));
@@ -73,7 +76,7 @@ const hashTree = (dir: string): string => {
 /** Open the SSE stream and collect `change` events. */
 async function openEvents(): Promise<{ events: string[]; close: () => void }> {
   const events: string[] = [];
-  const req = http.get(`${base}/api/events`, (res) => {
+  const req = http.get(`${base}/api/events?token=${server!.token}`, (res) => {
     res.setEncoding('utf8');
     res.on('data', (c: string) => events.push(...c.split('\n\n').filter((e) => e.startsWith('event: change'))));
   });
@@ -122,7 +125,7 @@ describe('server', () => {
     const { id } = await (await post(dir)).json();
     await fetch(`${base}/api/projects/${id}/boards/v6-sprint`); // starts the watcher
     const events: string[] = [];
-    const req = http.get(`${base}/api/events`, (res) => {
+    const req = http.get(`${base}/api/events?token=${server!.token}`, (res) => {
       res.setEncoding('utf8');
       res.on('data', (c: string) => events.push(...c.split('\n\n').filter((e) => e.startsWith('event: change'))));
     });
@@ -156,7 +159,7 @@ describe('server', () => {
     const { id } = await (await post(dir)).json();
     await fetch(`${base}/api/projects/${id}/boards/v6-sprint`, { signal: AbortSignal.timeout(3000) });
     const events: string[] = [];
-    const req = http.get(`${base}/api/events`, (res) => {
+    const req = http.get(`${base}/api/events?token=${server!.token}`, (res) => {
       res.setEncoding('utf8');
       res.on('data', (c: string) => events.push(...c.split('\n\n').filter((e) => e.startsWith('event: change'))));
     });
@@ -266,6 +269,32 @@ describe('server', () => {
     expect(await (await fetch(`${base}/some/route`)).text()).toBe('<html>app</html>');
     const esc = await rawGet('/..%2Fcfg%2Fprojects.json', `127.0.0.1:${server!.port}`);
     expect(esc.body).toBe('<html>app</html>');
+  });
+
+  it('requires the access token on every API route', async () => {
+    const bare = (u: string, init?: RequestInit) => globalThis.fetch(`${base}${u}`, init);
+    expect((await bare('/api/projects')).status).toBe(401);
+    expect((await bare('/api/state', { headers: { Authorization: 'Bearer wrong' } })).status).toBe(401);
+    expect((await bare(`/api/projects?token=${server!.token}`)).status).toBe(401); // the query only works for events
+    expect((await bare('/api/events')).status).toBe(401);
+    expect((await bare('/api/projects', { method: 'POST', headers: json, body: '{"path":"/"}' })).status).toBe(401);
+    expect((await bare('/')).status).toBe(200); // the web app itself needs no token
+  });
+
+  it('with scripts off never runs the project script', async () => {
+    await server!.close();
+    server = await startServer({ registry: new Registry(path.join(tmp, 'r3.json')), port: 0, webRoot: path.join(tmp, 'web'), scripts: false });
+    base = `http://127.0.0.1:${server.port}`;
+    expect(server.scripts).toBe(false);
+    const dir = copyFixture('v7');
+    const marker = path.join(tmp, 'script-ran');
+    fs.writeFileSync(path.join(dir, '_bmad', 'method', 'scripts', 'tickets.py'), `open(${JSON.stringify(marker)}, "w").close()\n`);
+    const { id } = await (await post(dir)).json();
+    const [summary] = await (await fetch(`${base}/api/projects`)).json();
+    const ref = (summary.sources as { id: string; kind: string }[]).find((r) => r.kind === 'v7-parent')!;
+    const board = await (await fetch(`${base}/api/projects/${id}/boards/${encodeURIComponent(ref.id)}`)).json();
+    expect((board.notices as { text: string }[]).some((n) => n.text.includes('--no-scripts'))).toBe(true);
+    expect(fs.existsSync(marker)).toBe(false);
   });
 
   it('answers 404 "web app not built" without a web root', async () => {

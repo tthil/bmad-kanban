@@ -4,6 +4,8 @@ A read-only Kanban board for [BMAD Method](https://github.com/bmad-code-org/BMAD
 
 It never writes to your project. Remove a project from the sidebar and only the board's own list changes; your folder is not touched.
 
+> **Note:** for BMAD v7 projects the board runs the project's own `_bmad/method/scripts/tickets.py` (through `uv`) to read ticket state. That script comes from the project, so opening a project you don't trust runs its code. Use `--no-scripts` for those projects.
+
 ## Usage
 
 Run it inside a BMAD project:
@@ -22,9 +24,12 @@ Options (`bmad-kanban --help`):
 
 - `--port N`: port to listen on (default 4310)
 - `--no-open`: do not open a browser
+- `--no-scripts`: never run the project's own BMAD scripts; v7 boards are read from the files directly
 - `[path]`: project folder (default: current directory)
 
-If a board is already running, the new project is added to it instead of starting a second server.
+If a board is already running, the new project is added to it instead of starting a second server. `--no-scripts` refuses to use a running board that runs scripts; stop that one first.
+
+The board's API only answers requests that carry its access token. `bmad-kanban` puts the token in the URL it opens (after the `#`), so open the board with the command rather than typing the address. The token lives in the config directory, readable only by you.
 
 Requirements: Node 22 or newer. `uv` is needed for full BMAD v7 fidelity (the board calls v7's own scripts through it). Without `uv` the board falls back to reading the files directly and shows a "reduced fidelity" notice.
 

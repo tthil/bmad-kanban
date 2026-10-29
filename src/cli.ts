@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import openBrowser from 'open';
 import { findProjectRoot } from './bmad/config.js';
-import { findRunning, removeLock, writeLock } from './instance.js';
+import { findRunning, loadToken, removeLock, writeLock } from './instance.js';
 import { configDir, Registry } from './registry.js';
 import { startServer, type RunningServer, type ServerOptions } from './server/app.js';
 
@@ -23,13 +23,14 @@ const defaultDeps: CliDeps = {
   stderr: (s) => void process.stderr.write(s),
 };
 
-const HELP = `Usage: bmad-kanban [path] [--port N] [--no-open]
+const HELP = `Usage: bmad-kanban [path] [--port N] [--no-open] [--no-scripts]
 
 Read-only Kanban board for BMAD Method projects.
 
   path         project folder (default: current directory)
   --port N     port to listen on (default: 4310)
   --no-open    do not open a browser
+  --no-scripts never run the project's own BMAD scripts (read the files only)
   --help       show this help
   --version    show the version
 `;
@@ -49,6 +50,7 @@ export async function main(argv: string[], deps: Partial<CliDeps> = {}): Promise
       options: {
         port: { type: 'string' },
         'no-open': { type: 'boolean' },
+        'no-scripts': { type: 'boolean' },
         help: { type: 'boolean' },
         version: { type: 'boolean' },
       },
@@ -78,14 +80,25 @@ export async function main(argv: string[], deps: Partial<CliDeps> = {}): Promise
     return 1;
   }
 
+  const scripts = !values['no-scripts'];
   const lockFile = path.join(configDir(), 'server.json');
-  let port = await findRunning(lockFile);
-  const reuse = port !== null;
-  if (port === null) {
+  const running = await findRunning(lockFile);
+  const reuse = running !== null;
+  if (running !== null && running.scripts && !scripts) {
+    d.stderr(`The board running at http://127.0.0.1:${running.port}/ runs project scripts. Stop it first to use --no-scripts.\n`);
+    return 1;
+  }
+  let port: number;
+  let token: string;
+  if (running !== null) {
+    ({ port, token } = running);
+  } else {
     const webRoot = fileURLToPath(new URL('./web/', import.meta.url));
-    const server = await d.startServer({ registry: new Registry(), port: wanted, webRoot });
-    port = server.port;
-    writeLock(lockFile, { port, pid: process.pid });
+    const server = await d.startServer({
+      registry: new Registry(), port: wanted, webRoot, scripts, token: loadToken(path.join(configDir(), 'token')),
+    });
+    ({ port, token } = server);
+    writeLock(lockFile, { port, pid: process.pid, token, scripts });
     const cleanup = () => removeLock(lockFile, process.pid);
     process.once('exit', cleanup);
     for (const sig of ['SIGINT', 'SIGTERM'] as const) {
@@ -102,7 +115,7 @@ export async function main(argv: string[], deps: Partial<CliDeps> = {}): Promise
   if (root) {
     const res = await fetch(`${base}api/projects`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ path: root }),
     });
     const body = (await res.json().catch(() => ({}))) as { id?: string; name?: string; error?: string };
@@ -114,11 +127,14 @@ export async function main(argv: string[], deps: Partial<CliDeps> = {}): Promise
     name = body.name ?? path.basename(root);
   }
 
+  // the token rides in the fragment, which the browser never sends to the server
+  url += `#token=${token}`;
   if (!values['no-open']) await d.open(url);
   if (reuse) {
     d.stdout(`Opened ${name ? `${name} in` : ''}${name ? ' ' : ''}the running board at ${url}\n`);
+    if (!running.scripts && scripts) d.stdout('Project scripts are off in the running board (started with --no-scripts).\n');
   } else {
-    d.stdout(`BMAD Kanban running at ${base}\n`);
+    d.stdout(`BMAD Kanban running at ${url}\n`);
   }
   return 0;
 }

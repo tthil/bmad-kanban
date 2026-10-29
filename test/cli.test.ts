@@ -48,14 +48,14 @@ describe('cli', () => {
   it('reuses a running instance without starting a server', async () => {
     const server = await startServer({ registry: new Registry(path.join(tmp, 'r.json')), port: 0, webRoot: tmp });
     started.push(server);
-    writeLock(path.join(tmp, 'cfg', 'server.json'), { port: server.port, pid: process.pid });
+    writeLock(path.join(tmp, 'cfg', 'server.json'), { port: server.port, pid: process.pid, token: server.token, scripts: true });
     const open = vi.fn(async () => undefined);
     const start = vi.fn();
     const code = await main([fixture], { ...io(), open, startServer: start });
     expect(code).toBe(0);
     expect(start).not.toHaveBeenCalled();
     const url = open.mock.calls[0]![0] as string;
-    expect(url).toMatch(new RegExp(`^http://127\\.0\\.0\\.1:${server.port}/\\?project=[0-9a-f]{12}$`));
+    expect(url).toBe(`http://127.0.0.1:${server.port}/?project=${url.match(/project=([0-9a-f]{12})/)![1]}#token=${server.token}`);
     expect(out.join('')).toBe(`Opened v6-sprint in the running board at ${url}\n`);
   });
 
@@ -65,13 +65,15 @@ describe('cli', () => {
     const code = await main([fixture, '--port', '0'], { ...io(), open, startServer: realStart });
     expect(code).toBe(0);
     expect(realStart).toHaveBeenCalledOnce();
-    const port = started[0]!.port;
+    const { port, token } = started[0]!;
     const url = open.mock.calls[0]![0] as string;
-    expect(url).toMatch(new RegExp(`^http://127\\.0\\.0\\.1:${port}/\\?project=[0-9a-f]{12}$`));
-    expect(out.join('')).toContain(`BMAD Kanban running at http://127.0.0.1:${port}/`);
+    expect(url).toMatch(new RegExp(`^http://127\\.0\\.0\\.1:${port}/\\?project=[0-9a-f]{12}#token=${token}$`));
+    expect(out.join('')).toBe(`BMAD Kanban running at ${url}\n`);
     const lock = JSON.parse(fs.readFileSync(path.join(tmp, 'cfg', 'server.json'), 'utf8'));
-    expect(lock).toEqual({ port, pid: process.pid });
-    const projects = await (await fetch(`http://127.0.0.1:${port}/api/projects`)).json();
+    expect(lock).toEqual({ port, pid: process.pid, token, scripts: true });
+    expect(fs.readFileSync(path.join(tmp, 'cfg', 'token'), 'utf8')).toBe(token); // kept for the next start
+    const auth = { headers: { Authorization: `Bearer ${token}` } };
+    const projects = await (await fetch(`http://127.0.0.1:${port}/api/projects`, auth)).json();
     expect(JSON.stringify(projects)).toContain('v6-sprint');
   });
 
@@ -81,6 +83,25 @@ describe('cli', () => {
     expect(code).toBe(0);
     expect(open).not.toHaveBeenCalled();
     expect(out.join('')).toContain('BMAD Kanban running at');
+  });
+
+  it('--no-scripts starts a server with scripts off', async () => {
+    realStart.mockClear();
+    const code = await main([fixture, '--port', '0', '--no-open', '--no-scripts'], { ...io(), open: vi.fn(), startServer: realStart });
+    expect(code).toBe(0);
+    expect(realStart.mock.calls[0]![0]).toMatchObject({ scripts: false });
+    expect(JSON.parse(fs.readFileSync(path.join(tmp, 'cfg', 'server.json'), 'utf8')).scripts).toBe(false);
+  });
+
+  it('--no-scripts refuses to reuse a board that runs scripts', async () => {
+    const server = await startServer({ registry: new Registry(path.join(tmp, 'r.json')), port: 0, webRoot: tmp });
+    started.push(server);
+    writeLock(path.join(tmp, 'cfg', 'server.json'), { port: server.port, pid: process.pid, token: server.token, scripts: true });
+    const open = vi.fn();
+    const code = await main([fixture, '--no-scripts'], { ...io(), open, startServer: vi.fn() });
+    expect(code).toBe(1);
+    expect(err.join('')).toContain('Stop it first to use --no-scripts');
+    expect(open).not.toHaveBeenCalled();
   });
 
   it('--version and --help', async () => {

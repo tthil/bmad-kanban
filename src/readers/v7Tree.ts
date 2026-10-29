@@ -14,7 +14,7 @@ type LeafType = 'story' | 'spike' | 'bug';
 const BREAKDOWN = 'tickets.toml';
 const TICKETS = 'tickets';
 const LEAF_TYPES: readonly string[] = ['story', 'spike', 'bug'];
-const REDUCED =
+export const REDUCED =
   'Read directly from the ticket files (reduced fidelity): prerequisites, "next" ordering and tracker status are not applied. Install uv and the BMad method scripts for the full view.';
 
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
