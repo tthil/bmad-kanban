@@ -66,6 +66,13 @@ npm run build     # dist/cli.js and dist/web
 npm run test:e2e  # Playwright smoke test; run the build first
 ```
 
+### Releasing
+
+1. `npm version <patch|minor|major>` and `git push --follow-tags`.
+2. Create a GitHub release for the new tag (`gh release create vX.Y.Z`).
+
+Publishing the release runs `.github/workflows/release.yml`, which tests the package and publishes it to npm with a provenance statement. It uses npm trusted publishing, so there is no npm token to manage. Don't run `npm publish` locally.
+
 ## Acknowledgements
 
 Inspired by [vscode-bmad-kanban](https://github.com/RianKhanafi/vscode-bmad-kanban) by RianKhanafi.

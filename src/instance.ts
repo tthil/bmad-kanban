@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { newToken, proof, sameSecret } from './token.js';
 
 /** The running server; the file holds its API token, so only the owner may read it. */
 export interface Lock { port: number; pid: number; token: string; scripts: boolean }
@@ -36,7 +37,7 @@ export function loadToken(file: string): string {
   } catch {
     // missing: create it below
   }
-  const token = randomBytes(32).toString('base64url');
+  const token = newToken();
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
   const tmp = `${file}.${process.pid}.tmp`;
   fs.rmSync(tmp, { force: true });
@@ -64,14 +65,13 @@ function pidAlive(pid: number): boolean {
   }
 }
 
+/** True when the board on the lock's port proves it holds the lock's token; the token itself is not sent. */
 async function answers(lock: Lock): Promise<boolean> {
+  const nonce = randomBytes(16).toString('hex');
   try {
-    const res = await fetch(`http://127.0.0.1:${lock.port}/api/state`, {
-      headers: { Authorization: `Bearer ${lock.token}` },
-      signal: AbortSignal.timeout(1000),
-    });
-    await res.arrayBuffer();
-    return res.status === 200;
+    const res = await fetch(`http://127.0.0.1:${lock.port}/api/hello?nonce=${nonce}`, { signal: AbortSignal.timeout(1000) });
+    const body = (await res.json()) as { proof?: unknown };
+    return res.status === 200 && typeof body.proof === 'string' && sameSecret(body.proof, proof(lock.token, nonce));
   } catch {
     return false;
   }

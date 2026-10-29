@@ -6,6 +6,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Registry } from '../src/registry.js';
 import { startServer } from '../src/server/app.js';
+import { proof } from '../src/token.js';
 
 const fixtures = path.resolve('test/fixtures');
 let tmp: string;
@@ -279,6 +280,15 @@ describe('server', () => {
     expect((await bare('/api/events')).status).toBe(401);
     expect((await bare('/api/projects', { method: 'POST', headers: json, body: '{"path":"/"}' })).status).toBe(401);
     expect((await bare('/')).status).toBe(200); // the web app itself needs no token
+  });
+
+  it('answers the hello challenge without a token, proving it holds one', async () => {
+    const nonce = 'ab'.repeat(16);
+    const r = await globalThis.fetch(`${base}/api/hello?nonce=${nonce}`);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ proof: proof(server!.token, nonce) });
+    expect((await globalThis.fetch(`${base}/api/hello?nonce=xyz`)).status).toBe(400);
+    expect((await globalThis.fetch(`${base}/api/hello`)).status).toBe(400);
   });
 
   it('with scripts off never runs the project script', async () => {

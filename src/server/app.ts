@@ -1,4 +1,3 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -6,6 +5,7 @@ import path from 'node:path';
 import type { ProjectSummary } from '../model.js';
 import { getStoryDetail, listSources, readBoard, UnknownSourceError, UnknownStoryError, type ReadOptions } from '../readers/detect.js';
 import { NotABmadProjectError, type ProjectPrefs, type Registry, type RegisteredProject } from '../registry.js';
+import { newToken, proof, sameSecret } from '../token.js';
 import { watchProject, type Unwatch } from './watch.js';
 
 /**
@@ -33,9 +33,6 @@ const TYPES: Record<string, string> = {
 
 const isMissing = (p: RegisteredProject): boolean => !fs.existsSync(path.join(p.path, '_bmad'));
 
-const digest = (s: string): Buffer => createHash('sha256').update(s).digest();
-const sameToken = (a: string, b: string): boolean => timingSafeEqual(digest(a), digest(b));
-
 async function summarize(p: RegisteredProject, read: ReadOptions): Promise<ProjectSummary> {
   const base = { id: p.id, name: p.name, path: p.path, prefs: { ...p.prefs } };
   if (isMissing(p)) {
@@ -51,7 +48,7 @@ async function summarize(p: RegisteredProject, read: ReadOptions): Promise<Proje
 
 export function startServer(opts: ServerOptions): Promise<RunningServer> {
   const { registry, webRoot } = opts;
-  const token = opts.token ?? randomBytes(32).toString('base64url');
+  const token = opts.token ?? newToken();
   const read: ReadOptions = { scripts: opts.scripts !== false };
   const watchers = new Map<string, Unwatch>();
   const clients = new Set<http.ServerResponse>();
@@ -161,6 +158,13 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
       return serveStatic(urlPath, res);
     }
 
+    // needs no token: it proves this board holds one without revealing it
+    if (seg[1] === 'hello' && seg.length === 2 && method === 'GET') {
+      const nonce = new URLSearchParams(query).get('nonce') ?? '';
+      if (!/^[0-9a-f]{32,128}$/.test(nonce)) throw new HttpError(400, 'nonce must be 32 to 128 hex characters');
+      return sendJson(res, 200, { proof: proof(token, nonce) });
+    }
+
     // EventSource cannot send headers, so the event stream also takes ?token=
     const auth = req.headers.authorization;
     const given = auth?.startsWith('Bearer ')
@@ -168,7 +172,7 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
       : seg[1] === 'events'
         ? new URLSearchParams(query).get('token')
         : null;
-    if (given === null || !sameToken(given, token)) {
+    if (given === null || !sameSecret(given, token)) {
       throw new HttpError(401, 'Missing or wrong access token: open the board with the bmad-kanban command');
     }
 
