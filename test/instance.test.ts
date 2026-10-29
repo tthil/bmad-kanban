@@ -58,6 +58,24 @@ describe('instance lock', () => {
     }
   });
 
+  it('an impostor on the port never receives the token', async () => {
+    const seen: string[] = [];
+    const impostor = http.createServer((q, r) => {
+      seen.push(`${q.url} ${q.headers.authorization ?? ''}`);
+      r.writeHead(200, { 'Content-Type': 'application/json' }).end('{"proof":"0000","lastViewed":null}');
+    });
+    await new Promise<void>((r) => impostor.listen(0, '127.0.0.1', r));
+    const port = (impostor.address() as { port: number }).port;
+    try {
+      writeLock(lock, { port, pid: process.pid, token: 'the-real-token', scripts: true });
+      expect(await findRunning(lock)).toBeNull();
+      expect(seen).toHaveLength(1);
+      expect(seen.join('\n')).not.toContain('the-real-token');
+    } finally {
+      await new Promise((r) => impostor.close(r));
+    }
+  });
+
   it('live pid but nothing answering on the port -> null, lock deleted', async () => {
     const dummy = http.createServer((_q, r) => r.writeHead(500).end());
     await new Promise<void>((r) => dummy.listen(0, '127.0.0.1', r));
