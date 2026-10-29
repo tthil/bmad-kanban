@@ -38,4 +38,6 @@ export interface ProjectSummary {
   sources: SourceRef[]; defaultSourceId: string | null;
   error?: string;
   prefs?: ProjectPrefs;
+  /** false: added from a browser, so the project's own scripts never run */
+  trusted?: boolean;
 }

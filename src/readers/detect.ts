@@ -22,9 +22,10 @@ export class UnknownStoryError extends Error {
   }
 }
 
-/** `scripts: false` never runs the project's own scripts (--no-scripts). */
+/** `scripts: false` never runs the project's own scripts; `offNotice` replaces the board's "scripts are off" notice. */
 export interface ReadOptions {
   scripts?: boolean;
+  offNotice?: string;
 }
 
 export interface SourceListing {
@@ -94,7 +95,7 @@ function resolveTarget(cfg: BmadConfig, sourceId: string): Target | null {
 async function loadBoard(cfg: BmadConfig, t: Target, opts: ReadOptions): Promise<Board> {
   if (t.type === 'v6-sprint') return readV6Sprint(cfg, t.id);
   if (t.type === 'v6-spec') return readV6Spec(t.path, t.id);
-  return readV7(cfg, t.path, t.folderKind, t.id, opts.scripts === false ? null : undefined);
+  return readV7(cfg, t.path, t.folderKind, t.id, opts.scripts === false ? null : undefined, opts.offNotice);
 }
 
 function refFor(t: Target, board: Board | null): SourceRef {

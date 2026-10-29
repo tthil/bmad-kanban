@@ -30,7 +30,9 @@ Options (`bmad-kanban --help`):
 
 If a board is already running, the new project is added to it instead of starting a second server. `--no-scripts` refuses to use a running board that runs scripts; stop that one first.
 
-The board's API only answers requests that carry its access token. `bmad-kanban` puts the token in the URL it opens (after the `#`), so open the board with the command rather than typing the address. The token lives in the config directory, readable only by you.
+Once the board is running, open http://localhost:4310 in any browser. It only listens on your own machine, and websites you visit cannot use it.
+
+Projects you add with the `bmad-kanban` command are *trusted*: for v7 they run the project's own script. Projects added from the board's sidebar in a browser are read from their files only and never run a script, so nothing on your machine can make the board run code from a folder you didn't choose. Run `bmad-kanban <path>` once to trust such a project. (The command proves itself to the board with a token kept in the config directory, readable only by you.)
 
 Requirements: Node 22 or newer. `uv` is needed for full BMAD v7 fidelity (the board calls v7's own scripts through it). Without `uv` the board falls back to reading the files directly and shows a "reduced fidelity" notice.
 
