@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,9 +24,24 @@ const KNOWN_BROWSERS: readonly string[] = ['chrome', 'brave', 'firefox', 'edge',
 const browserApp = (browser: string): string | readonly string[] =>
   KNOWN_BROWSERS.includes(browser.toLowerCase()) ? apps[browser.toLowerCase() as AppName] : browser;
 
+/** Orca's CLI; on Linux a bare `orca` is usually the GNOME screen reader. */
+const orcaCommand = (): string =>
+  process.env.ORCA_CLI_COMMAND || (process.platform === 'linux' ? 'orca-ide' : 'orca');
+
+/** Open `url` in a tab of Orca's built-in browser, in the workspace shown in Orca. */
+const openInOrca = (url: string): Promise<void> =>
+  new Promise((resolve, reject) => {
+    execFile(orcaCommand(), ['tab', 'create', '--url', url, '--worktree', 'active', '--json'], { timeout: 15_000 }, (err, _out, stderr) => {
+      if (err === null) return resolve();
+      const why = stderr.trim().split('\n').pop() || err.message;
+      reject(new Error((err as NodeJS.ErrnoException).code === 'ENOENT' ? `${orcaCommand()} command not found` : why));
+    });
+  });
+
 /** Open `url` in `browser`; rejects when that browser is not installed. */
-async function launch(url: string, browser?: string): Promise<void> {
+export async function launch(url: string, browser?: string): Promise<void> {
   if (browser === undefined) return void (await openBrowser(url));
+  if (browser.toLowerCase() === 'orca') return openInOrca(url);
   const child = await openBrowser(url, { app: { name: browserApp(browser) } });
   // open() resolves even for a missing app, but its launcher fails at once, so give it a moment
   await new Promise<void>((resolve, reject) => {
@@ -48,7 +64,7 @@ Read-only Kanban board for BMAD Method projects.
 
   path            project folder (default: current directory)
   --port N        port to listen on (default: 4310)
-  --browser NAME  browser to open: chrome, brave, firefox, edge, safari or any
+  --browser NAME  browser to open: chrome, brave, firefox, edge, safari, orca or any
                   app name (default: $BMAD_KANBAN_BROWSER, else the system browser)
   --no-open       do not open a browser
   --no-scripts    never run the project's own BMAD scripts (read the files only)
