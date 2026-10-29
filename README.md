@@ -23,7 +23,8 @@ npx bmad-kanban ~/code/my-project
 Options (`bmad-kanban --help`):
 
 - `--port N`: port to listen on (default 4310)
-- `--no-open`: do not open a browser
+- `--browser NAME`: open the board in this browser: `chrome`, `brave`, `firefox`, `edge`, `safari`, `orca` (a tab in Orca's built-in browser, in the workspace Orca is showing), or any installed app name (e.g. `Arc`). Set `BMAD_KANBAN_BROWSER` to make it your default; the flag wins over the variable.
+- `--no-open`: do not open a browser; the address to open is printed instead
 - `--no-scripts`: never run the project's own BMAD scripts; v7 boards are read from the files directly
 - `[path]`: project folder (default: current directory)
 

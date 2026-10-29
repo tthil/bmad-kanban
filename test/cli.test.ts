@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { main } from '../src/cli.js';
+import { launch, main } from '../src/cli.js';
 import { writeLock } from '../src/instance.js';
 import { Registry } from '../src/registry.js';
 import { startServer, type RunningServer } from '../src/server/app.js';
@@ -102,6 +102,50 @@ describe('cli', () => {
     expect(code).toBe(1);
     expect(err.join('')).toContain('Stop it first to use --no-scripts');
     expect(open).not.toHaveBeenCalled();
+  });
+
+  it('--browser picks the browser, BMAD_KANBAN_BROWSER sets the default', async () => {
+    const open = vi.fn(async () => undefined);
+    await main([fixture, '--port', '0', '--browser', 'firefox'], { ...io(), open, startServer: realStart });
+    expect(open.mock.calls[0]![1]).toBe('firefox');
+    process.env.BMAD_KANBAN_BROWSER = 'safari';
+    try {
+      await main([fixture], { ...io(), open, startServer: realStart });
+      expect(open.mock.calls[1]![1]).toBe('safari');
+      await main([fixture, '--browser', 'chrome'], { ...io(), open, startServer: realStart });
+      expect(open.mock.calls[2]![1]).toBe('chrome'); // the flag wins
+    } finally {
+      delete process.env.BMAD_KANBAN_BROWSER;
+    }
+    await main([fixture], { ...io(), open, startServer: realStart });
+    expect(open.mock.calls[3]![1]).toBeUndefined(); // system browser
+  });
+
+  it('a browser that cannot be opened still prints the address', async () => {
+    const open = vi.fn(async () => {
+      throw new Error('app not found');
+    });
+    const code = await main([fixture, '--port', '0', '--browser', 'nope'], { ...io(), open, startServer: realStart });
+    expect(code).toBe(0);
+    expect(err.join('')).toContain('Could not open nope: app not found.');
+    expect(out.join('')).toMatch(/BMAD Kanban running at http:\/\/127\.0\.0\.1:\d+\/\?project=\w+#token=/);
+  });
+
+  it.skipIf(process.platform === 'win32')('--browser orca opens a tab in Orca through its CLI', async () => {
+    const fake = path.join(tmp, 'orca');
+    const log = path.join(tmp, 'orca-args.json');
+    fs.writeFileSync(fake, `#!/usr/bin/env node\nrequire('fs').writeFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)));\n`, { mode: 0o755 });
+    process.env.ORCA_CLI_COMMAND = fake;
+    try {
+      await launch('http://127.0.0.1:1/#token=t', 'Orca');
+      expect(JSON.parse(fs.readFileSync(log, 'utf8'))).toEqual(['tab', 'create', '--url', 'http://127.0.0.1:1/#token=t', '--worktree', 'active', '--json']);
+      fs.writeFileSync(fake, '#!/bin/sh\necho "Orca is not running" >&2\nexit 1\n');
+      await expect(launch('http://127.0.0.1:1/', 'orca')).rejects.toThrow('Orca is not running');
+      process.env.ORCA_CLI_COMMAND = path.join(tmp, 'missing-orca');
+      await expect(launch('http://127.0.0.1:1/', 'orca')).rejects.toThrow('command not found');
+    } finally {
+      delete process.env.ORCA_CLI_COMMAND;
+    }
   });
 
   it('--version and --help', async () => {
