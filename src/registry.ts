@@ -13,6 +13,8 @@ export interface RegisteredProject {
   path: string;
   name: string;
   prefs: ProjectPrefs;
+  /** Added by the bmad-kanban command; only trusted projects run their own scripts. */
+  trusted: boolean;
 }
 
 export class NotABmadProjectError extends Error {
@@ -46,15 +48,19 @@ export class Registry {
     return p && copy(p);
   }
 
-  add(input: string): RegisteredProject {
+  /** Adding again with `trusted` trusts an existing project; adding untrusted never untrusts one. */
+  add(input: string, trusted = true): RegisteredProject {
     const resolved = path.resolve(input);
     const root = fs.existsSync(resolved) ? findProjectRoot(resolved) : null;
     if (!root) throw new NotABmadProjectError(resolved);
     const id = createHash('sha1').update(root).digest('hex').slice(0, 12);
     let p = this.projects.find((x) => x.id === id);
     if (!p) {
-      p = { id, path: root, name: path.basename(root), prefs: defaultPrefs() };
+      p = { id, path: root, name: path.basename(root), prefs: defaultPrefs(), trusted };
       this.projects.push(p);
+      this.save();
+    } else if (trusted && !p.trusted) {
+      p.trusted = true;
       this.save();
     }
     return copy(p);
@@ -96,6 +102,7 @@ export class Registry {
         path: p.path,
         name: p.name,
         prefs: { ...defaultPrefs(), ...p.prefs },
+        trusted: p.trusted !== false, // projects listed before trust existed were added by the command
       }));
       this.lastViewed = typeof data.lastViewed === 'string' ? data.lastViewed : null;
     } catch {

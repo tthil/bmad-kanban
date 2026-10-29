@@ -34,7 +34,7 @@ const TYPES: Record<string, string> = {
 const isMissing = (p: RegisteredProject): boolean => !fs.existsSync(path.join(p.path, '_bmad'));
 
 async function summarize(p: RegisteredProject, read: ReadOptions): Promise<ProjectSummary> {
-  const base = { id: p.id, name: p.name, path: p.path, prefs: { ...p.prefs } };
+  const base = { id: p.id, name: p.name, path: p.path, prefs: { ...p.prefs }, trusted: p.trusted };
   if (isMissing(p)) {
     return { ...base, missing: true, sources: [], tags: [], version: null, defaultSourceId: null };
   }
@@ -49,7 +49,15 @@ async function summarize(p: RegisteredProject, read: ReadOptions): Promise<Proje
 export function startServer(opts: ServerOptions): Promise<RunningServer> {
   const { registry, webRoot } = opts;
   const token = opts.token ?? newToken();
-  const read: ReadOptions = { scripts: opts.scripts !== false };
+  const scripts = opts.scripts !== false;
+  // an untrusted project (added from a browser) is read from its files only
+  const readFor = (p: RegisteredProject): ReadOptions =>
+    !scripts || p.trusted
+      ? { scripts }
+      : {
+          scripts: false,
+          offNotice: `Read directly from the ticket files: this project was added from the browser, so its scripts are not run. Run \`bmad-kanban ${p.path}\` once to trust it.`,
+        };
   const watchers = new Map<string, Unwatch>();
   const clients = new Set<http.ServerResponse>();
   let actualPort = 0;
@@ -158,23 +166,17 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
       return serveStatic(urlPath, res);
     }
 
-    // needs no token: it proves this board holds one without revealing it
+    // proves this board holds the token without revealing it
     if (seg[1] === 'hello' && seg.length === 2 && method === 'GET') {
       const nonce = new URLSearchParams(query).get('nonce') ?? '';
       if (!/^[0-9a-f]{32,128}$/.test(nonce)) throw new HttpError(400, 'nonce must be 32 to 128 hex characters');
       return sendJson(res, 200, { proof: proof(token, nonce) });
     }
 
-    // EventSource cannot send headers, so the event stream also takes ?token=
+    // The API is open to any browser on this machine, like a dev server. The token only
+    // decides whether a project being added is trusted to run its own scripts.
     const auth = req.headers.authorization;
-    const given = auth?.startsWith('Bearer ')
-      ? auth.slice('Bearer '.length)
-      : seg[1] === 'events'
-        ? new URLSearchParams(query).get('token')
-        : null;
-    if (given === null || !sameSecret(given, token)) {
-      throw new HttpError(401, 'Missing or wrong access token: open the board with the bmad-kanban command');
-    }
+    const withToken = auth?.startsWith('Bearer ') === true && sameSecret(auth.slice('Bearer '.length), token);
 
     if (seg[1] === 'events' && seg.length === 2 && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
@@ -200,14 +202,14 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
     if (seg[1] === 'projects') {
       if (seg.length === 2 && method === 'GET') {
         await watchAll(); // picks up projects whose folder came back
-        return sendJson(res, 200, await Promise.all(registry.list().map((p) => summarize(p, read))));
+        return sendJson(res, 200, await Promise.all(registry.list().map((p) => summarize(p, readFor(p)))));
       }
       if (seg.length === 2 && method === 'POST') {
         const body = await readJson(req);
         if (typeof body.path !== 'string' || body.path === '') throw new HttpError(400, 'path is required');
-        const added = registry.add(body.path);
+        const added = registry.add(body.path, withToken);
         await ensureWatcher(added);
-        const summary = await summarize(added, read);
+        const summary = await summarize(added, readFor(added));
         broadcast('projects', {});
         return sendJson(res, 201, summary);
       }
@@ -236,9 +238,9 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
           throw new HttpError(410, 'Project folder is missing');
         }
         await ensureWatcher(p);
-        if (seg.length === 5) return sendJson(res, 200, await readBoard(p.path, seg[4], read));
+        if (seg.length === 5) return sendJson(res, 200, await readBoard(p.path, seg[4], readFor(p)));
         if (seg.length === 7 && seg[5] === 'stories') {
-          return sendJson(res, 200, await getStoryDetail(p.path, seg[4], seg[6]!, read));
+          return sendJson(res, 200, await getStoryDetail(p.path, seg[4], seg[6]!, readFor(p)));
         }
       }
     }
@@ -284,7 +286,7 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
     return {
       port: actualPort,
       token,
-      scripts: read.scripts !== false,
+      scripts,
       close: () =>
         new Promise<void>((resolve) => {
           for (const id of [...watchers.keys()]) stopWatcher(id);

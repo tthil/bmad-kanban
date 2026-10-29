@@ -31,6 +31,16 @@ describe('Registry', () => {
     expect(reg.list()).toHaveLength(1);
   });
 
+  it('trusts command-added projects; adding untrusted never untrusts', () => {
+    const reg = new Registry(file);
+    expect(reg.add(fixture, false).trusted).toBe(false);
+    expect(reg.add(fixture, true).trusted).toBe(true);
+    expect(reg.add(fixture, false).trusted).toBe(true);
+    expect(new Registry(file).list()[0]!.trusted).toBe(true); // persisted
+    fs.writeFileSync(file, JSON.stringify({ version: 1, projects: [{ id: 'a', path: fixture, name: 'x', prefs: {} }] }));
+    expect(new Registry(file).list()[0]!.trusted).toBe(true); // listed before trust existed
+  });
+
   it('rejects non-BMAD and missing paths', () => {
     const reg = new Registry(file);
     expect(() => reg.add(tmp)).toThrow(NotABmadProjectError);
