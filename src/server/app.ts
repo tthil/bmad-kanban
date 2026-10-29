@@ -1,14 +1,19 @@
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import type { ProjectSummary } from '../model.js';
-import { getStoryDetail, listSources, readBoard, UnknownSourceError, UnknownStoryError } from '../readers/detect.js';
+import { getStoryDetail, listSources, readBoard, UnknownSourceError, UnknownStoryError, type ReadOptions } from '../readers/detect.js';
 import { NotABmadProjectError, type ProjectPrefs, type Registry, type RegisteredProject } from '../registry.js';
 import { watchProject, type Unwatch } from './watch.js';
 
-export interface ServerOptions { registry: Registry; port: number; webRoot: string }
-export interface RunningServer { port: number; close(): Promise<void> }
+/**
+ * `token` guards every /api request (default: a fresh random one); `scripts: false`
+ * never runs a project's own scripts (default: true).
+ */
+export interface ServerOptions { registry: Registry; port: number; webRoot: string; token?: string; scripts?: boolean }
+export interface RunningServer { port: number; token: string; scripts: boolean; close(): Promise<void> }
 
 class HttpError extends Error {
   constructor(public readonly status: number, message: string) {
@@ -28,12 +33,15 @@ const TYPES: Record<string, string> = {
 
 const isMissing = (p: RegisteredProject): boolean => !fs.existsSync(path.join(p.path, '_bmad'));
 
-async function summarize(p: RegisteredProject): Promise<ProjectSummary> {
+const digest = (s: string): Buffer => createHash('sha256').update(s).digest();
+const sameToken = (a: string, b: string): boolean => timingSafeEqual(digest(a), digest(b));
+
+async function summarize(p: RegisteredProject, read: ReadOptions): Promise<ProjectSummary> {
   const base = { id: p.id, name: p.name, path: p.path, prefs: { ...p.prefs } };
   if (isMissing(p)) {
     return { ...base, missing: true, sources: [], tags: [], version: null, defaultSourceId: null };
   }
-  const l = await listSources(p.path);
+  const l = await listSources(p.path, read);
   const s: ProjectSummary = {
     ...base, missing: false, sources: l.sources, tags: l.tags, version: l.version, defaultSourceId: l.defaultSourceId,
   };
@@ -43,6 +51,8 @@ async function summarize(p: RegisteredProject): Promise<ProjectSummary> {
 
 export function startServer(opts: ServerOptions): Promise<RunningServer> {
   const { registry, webRoot } = opts;
+  const token = opts.token ?? randomBytes(32).toString('base64url');
+  const read: ReadOptions = { scripts: opts.scripts !== false };
   const watchers = new Map<string, Unwatch>();
   const clients = new Set<http.ServerResponse>();
   let actualPort = 0;
@@ -136,7 +146,7 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
       throw new HttpError(403, 'Forbidden host');
     }
     const method = req.method ?? 'GET';
-    const urlPath = (req.url ?? '/').split('?')[0]!;
+    const [urlPath = '/', query = ''] = (req.url ?? '/').split('?');
     // split before decoding so an encoded %2F stays inside a segment
     const seg = urlPath.split('/').filter(Boolean).map((s) => {
       try {
@@ -149,6 +159,17 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
     if (seg[0] !== 'api') {
       if (method !== 'GET' && method !== 'HEAD') throw new HttpError(405, 'Method not allowed');
       return serveStatic(urlPath, res);
+    }
+
+    // EventSource cannot send headers, so the event stream also takes ?token=
+    const auth = req.headers.authorization;
+    const given = auth?.startsWith('Bearer ')
+      ? auth.slice('Bearer '.length)
+      : seg[1] === 'events'
+        ? new URLSearchParams(query).get('token')
+        : null;
+    if (given === null || !sameToken(given, token)) {
+      throw new HttpError(401, 'Missing or wrong access token: open the board with the bmad-kanban command');
     }
 
     if (seg[1] === 'events' && seg.length === 2 && method === 'GET') {
@@ -175,14 +196,14 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
     if (seg[1] === 'projects') {
       if (seg.length === 2 && method === 'GET') {
         await watchAll(); // picks up projects whose folder came back
-        return sendJson(res, 200, await Promise.all(registry.list().map(summarize)));
+        return sendJson(res, 200, await Promise.all(registry.list().map((p) => summarize(p, read))));
       }
       if (seg.length === 2 && method === 'POST') {
         const body = await readJson(req);
         if (typeof body.path !== 'string' || body.path === '') throw new HttpError(400, 'path is required');
         const added = registry.add(body.path);
         await ensureWatcher(added);
-        const summary = await summarize(added);
+        const summary = await summarize(added, read);
         broadcast('projects', {});
         return sendJson(res, 201, summary);
       }
@@ -211,9 +232,9 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
           throw new HttpError(410, 'Project folder is missing');
         }
         await ensureWatcher(p);
-        if (seg.length === 5) return sendJson(res, 200, await readBoard(p.path, seg[4]));
+        if (seg.length === 5) return sendJson(res, 200, await readBoard(p.path, seg[4], read));
         if (seg.length === 7 && seg[5] === 'stories') {
-          return sendJson(res, 200, await getStoryDetail(p.path, seg[4], seg[6]!));
+          return sendJson(res, 200, await getStoryDetail(p.path, seg[4], seg[6]!, read));
         }
       }
     }
@@ -258,6 +279,8 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
     await watchAll();
     return {
       port: actualPort,
+      token,
+      scripts: read.scripts !== false,
       close: () =>
         new Promise<void>((resolve) => {
           for (const id of [...watchers.keys()]) stopWatcher(id);

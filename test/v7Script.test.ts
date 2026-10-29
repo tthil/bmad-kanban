@@ -29,6 +29,14 @@ const checkoutDoc = {
 const hasReduced = (b: { notices: { text: string }[] }) => b.notices.some((n) => n.text.includes('reduced fidelity'));
 
 describe('readV7 with an injected script runner', () => {
+  it('null runner (--no-scripts) reads the files and says scripts are off', async () => {
+    const b = await readV7(cfg, checkout, 'initiative', 's', null);
+    const files = readV7Tree(checkout, 'initiative', 's');
+    expect(b.stories).toEqual(files.stories);
+    expect(hasReduced(b)).toBe(false);
+    expect(b.notices.some((n) => n.text.includes('--no-scripts'))).toBe(true);
+  });
+
   it('maps rows to columns and calls uv exactly', async () => {
     const calls: unknown[][] = [];
     const run: RunScript = async (...a) => {

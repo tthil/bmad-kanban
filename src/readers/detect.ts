@@ -22,6 +22,11 @@ export class UnknownStoryError extends Error {
   }
 }
 
+/** `scripts: false` never runs the project's own scripts (--no-scripts). */
+export interface ReadOptions {
+  scripts?: boolean;
+}
+
 export interface SourceListing {
   sources: SourceRef[];
   defaultSourceId: string | null;
@@ -86,10 +91,10 @@ function resolveTarget(cfg: BmadConfig, sourceId: string): Target | null {
   return null;
 }
 
-async function loadBoard(cfg: BmadConfig, t: Target): Promise<Board> {
+async function loadBoard(cfg: BmadConfig, t: Target, opts: ReadOptions): Promise<Board> {
   if (t.type === 'v6-sprint') return readV6Sprint(cfg, t.id);
   if (t.type === 'v6-spec') return readV6Spec(t.path, t.id);
-  return readV7(cfg, t.path, t.folderKind, t.id);
+  return readV7(cfg, t.path, t.folderKind, t.id, opts.scripts === false ? null : undefined);
 }
 
 function refFor(t: Target, board: Board | null): SourceRef {
@@ -116,15 +121,15 @@ function refFor(t: Target, board: Board | null): SourceRef {
   return ref;
 }
 
-async function refOf(cfg: BmadConfig, t: Target): Promise<SourceRef> {
+async function refOf(cfg: BmadConfig, t: Target, opts: ReadOptions): Promise<SourceRef> {
   try {
-    return refFor(t, await loadBoard(cfg, t));
+    return refFor(t, await loadBoard(cfg, t, opts));
   } catch {
     return refFor(t, null);
   }
 }
 
-export async function listSources(root: string): Promise<SourceListing> {
+export async function listSources(root: string, opts: ReadOptions = {}): Promise<SourceListing> {
   let cfg: BmadConfig;
   try {
     cfg = loadBmadConfig(root);
@@ -142,7 +147,7 @@ export async function listSources(root: string): Promise<SourceListing> {
     if (f.kind !== 'backlog' && f.kind !== 'parent' && children.has(f.name)) continue;
     targets.push(v7Target(f));
   }
-  const sources = await Promise.all(targets.map((t) => refOf(cfg, t)));
+  const sources = await Promise.all(targets.map((t) => refOf(cfg, t, opts)));
 
   const flat = sources.flatMap((s) => [s, ...(s.children ?? [])]);
   const active = cfg.activeInitiative === null ? undefined : flat.find((s) => s.id === `v7:${cfg.activeInitiative}`);
@@ -152,7 +157,7 @@ export async function listSources(root: string): Promise<SourceListing> {
   return { sources, defaultSourceId: active?.id ?? sources[0]?.id ?? null, tags, version: cfg.version };
 }
 
-export async function readBoard(root: string, sourceId: string): Promise<Board> {
+export async function readBoard(root: string, sourceId: string, opts: ReadOptions = {}): Promise<Board> {
   let cfg: BmadConfig;
   try {
     cfg = loadBmadConfig(root);
@@ -162,7 +167,7 @@ export async function readBoard(root: string, sourceId: string): Promise<Board> 
   const t = resolveTarget(cfg, sourceId);
   if (t === null) throw new UnknownSourceError(sourceId);
   try {
-    return markNoFile(cfg, t, await loadBoard(cfg, t));
+    return markNoFile(cfg, t, await loadBoard(cfg, t, opts));
   } catch (e) {
     return {
       sourceId,
@@ -207,7 +212,12 @@ function markNoFile(cfg: BmadConfig, t: Target, board: Board): Board {
   return board;
 }
 
-export async function getStoryDetail(root: string, sourceId: string, storyKey: string): Promise<StoryDetail> {
+export async function getStoryDetail(
+  root: string,
+  sourceId: string,
+  storyKey: string,
+  opts: ReadOptions = {},
+): Promise<StoryDetail> {
   let cfg: BmadConfig;
   try {
     cfg = loadBmadConfig(root);
@@ -224,7 +234,7 @@ export async function getStoryDetail(root: string, sourceId: string, storyKey: s
       return { path: null, markdown: text };
     }
     // a story on the board whose file hasn't been written yet is not an error
-    const board = await loadBoard(cfg, t);
+    const board = await loadBoard(cfg, t, opts);
     if (!board.stories.some((s) => s.key === storyKey)) throw new UnknownStoryError(storyKey);
     return { path: null, markdown: '' };
   }

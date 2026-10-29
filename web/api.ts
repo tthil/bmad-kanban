@@ -8,9 +8,34 @@ export class ApiError extends Error {
 
 const enc = encodeURIComponent;
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
+const TOKEN_KEY = 'bmad-kanban-token';
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
+/** The CLI opens the board with #token=…; keep it for this tab and take it out of the address bar. */
+function takeToken(): string {
+  const fromHash = new URLSearchParams(location.hash.slice(1)).get('token');
+  if (fromHash !== null) {
+    history.replaceState(null, '', location.pathname + location.search);
+    try {
+      sessionStorage.setItem(TOKEN_KEY, fromHash);
+    } catch {
+      // still works until the tab reloads
+    }
+    return fromHash;
+  }
+  try {
+    return sessionStorage.getItem(TOKEN_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+const token = takeToken();
+
+/** EventSource cannot send headers, so the stream gets the token in its query. */
+export const eventsUrl = `/api/events?token=${encodeURIComponent(token)}`;
+
+async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${token}` } });
   if (!res.ok) {
     let msg = `${res.status} ${res.statusText}`;
     try {

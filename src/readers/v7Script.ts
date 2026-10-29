@@ -5,7 +5,7 @@ import { parse as parseToml } from 'smol-toml';
 import type { BmadConfig } from '../bmad/config.js';
 import type { Board, Epic, Notice, Story } from '../model.js';
 import { mapStatus, mapV7State } from '../status.js';
-import { epicTitleFromFile, listV7Folders, readV7Tree, type V7FolderKind } from './v7Tree.js';
+import { epicTitleFromFile, listV7Folders, readV7Tree, REDUCED, type V7FolderKind } from './v7Tree.js';
 
 export type RunScript = (
   cmd: string,
@@ -19,6 +19,16 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 const present = (v: unknown): boolean => v !== null && v !== undefined && String(v) !== '';
 const text = (v: unknown): string => (v === null || v === undefined ? '' : String(v));
+
+const SCRIPTS_OFF =
+  'Read directly from the ticket files: scripts are turned off (--no-scripts), so prerequisites, "next" ordering and tracker status are not applied.';
+
+/** The file reader's notices, reworded for a board whose scripts were turned off rather than missing. */
+function scriptsOff(b: Board): Board {
+  b.notices = b.notices.map((n) => (n.text === REDUCED ? { ...n, text: SCRIPTS_OFF } : n));
+  b.children?.forEach(scriptsOff);
+  return b;
+}
 
 export const runScript: RunScript = (cmd, args, cwd, timeoutMs) =>
   new Promise((resolve, reject) => {
@@ -133,8 +143,10 @@ export async function readV7(
   folder: string,
   kind: V7FolderKind,
   sourceId: string,
-  run: RunScript = runScript,
+  run: RunScript | null = runScript,
 ): Promise<Board> {
+  // null: the project's scripts must not run (--no-scripts)
+  if (run === null) return scriptsOff(readV7Tree(folder, kind, sourceId));
   const script = path.join(cfg.root, '_bmad', 'method', 'scripts', 'tickets.py');
   if (!fs.existsSync(script)) return readV7Tree(folder, kind, sourceId);
   try {
