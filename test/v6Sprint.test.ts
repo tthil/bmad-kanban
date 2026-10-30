@@ -169,6 +169,7 @@ describe('quick-flow specs', () => {
   it('adds spec-*.md files after the sprint stories, in a Quick specs lane', () => {
     expect(board.stories.map((s) => s.key)).toEqual([
       '1-1-user-login',
+      '1-2-password-reset',
       'spec-broken',
       'spec-fix-typo',
       'spec-gh-2-by-country-catch-up-job',
@@ -201,6 +202,13 @@ describe('quick-flow specs', () => {
 
   it('opens the spec file as the card detail', () => {
     expect(v6SprintDetailPath(cfg, 'spec-fix-typo')).toMatch(/spec-fix-typo\.md$/);
+  });
+
+  it("treats a story's own spec (BMAD 6.12 spec-<epic>-<story>-*.md) as that story's file, not a quick card", () => {
+    expect(board.stories.filter((s) => s.id === '1.1' || s.id === '1.2').every((s) => !s.quick)).toBe(true);
+    expect(v6SprintDetailPath(cfg, '1-1-user-login')).toMatch(/spec-1-1-user-login\.md$/);
+    expect(v6SprintDetailPath(cfg, '1-2-password-reset')).toMatch(/spec-1-2-reset-a-password\.md$/);
+    expect(v6SprintDetailPath(cfg, '1-3-not-there')).toBeNull();
   });
 
   it('shows a board for a project with only quick specs', () => {
