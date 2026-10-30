@@ -16,12 +16,13 @@ export function SwimlaneView(props: { board: Board; showDropped: boolean; onOpen
         const info = lane.epic ? epics.get(lane.epic.id) : undefined;
         const pct = lane.total === 0 ? 0 : Math.round((lane.done / lane.total) * 100);
         return [
-          <div class="lane-head" key={`h-${lane.epic?.id ?? '-'}`}
-            style={{ borderLeftColor: info ? epicColor(info.index) : 'var(--muted)' }}>
+          <div class={`lane-head${lane.epic?.quick ? ' quick' : ''}`} key={`h-${lane.epic?.id ?? '-'}`}
+            style={{ borderLeftColor: lane.epic?.quick ? 'var(--quick)' : info ? epicColor(info.index) : 'var(--muted)' }}>
             <div class="lane-title">
-              {lane.epic ? <>{lane.epic.id} {lane.epic.title}</> : 'No epic'}
+              {lane.epic?.quick ? lane.epic.title : lane.epic ? <>{lane.epic.id} {lane.epic.title}</> : 'No epic'}
             </div>
             <div class="lane-meta">
+              {lane.epic?.quick && <span>outside the sprint</span>}
               {lane.epic?.status && <span>{lane.epic.status}</span>}
               {lane.epic?.retrospective === 'done' && <span class="retro-tag">✓ retro</span>}
               <span>{lane.done}/{lane.total} done</span>

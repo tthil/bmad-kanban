@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import type { BmadConfig } from '../bmad/config.js';
+import { FrontmatterError, readFrontmatter } from '../bmad/frontmatter.js';
 import type { Board, Epic, Notice, Story } from '../model.js';
 import { mapStatus } from '../status.js';
 
@@ -60,8 +61,61 @@ function epicFiles(cfg: BmadConfig): string[] {
   ];
 }
 
+/**
+ * `spec-*.md` files in the implementation folder. BMAD 6.12's build writes one per piece of work:
+ * `spec-2-1-<slug>.md` for sprint story 2.1, any other name (`spec-gh-47-fix-auth.md`) for a quick-flow change.
+ */
+function specFiles(cfg: BmadConfig): string[] {
+  return mdFiles(cfg.implementationArtifacts, (n) => n.startsWith('spec-'));
+}
+
+/** The `<epic>-<story><suffix>` prefix a spec file names (`spec-2-1-x.md` → `2-1`), or null. */
+function specPrefix(file: string): string | null {
+  const m = STORY_KEY_RE.exec(path.basename(file, '.md').slice('spec-'.length));
+  return m ? prefixOf(m[1]!, m[2]!, m[3]!) : null;
+}
+
 export function detectV6Sprint(cfg: BmadConfig): boolean {
-  return isFile(path.join(cfg.implementationArtifacts, STATUS_FILE)) || epicFiles(cfg).length > 0;
+  return isFile(path.join(cfg.implementationArtifacts, STATUS_FILE)) || epicFiles(cfg).length > 0 || specFiles(cfg).length > 0;
+}
+
+export const QUICK_EPIC_ID = 'quick';
+
+const textOf = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+
+/** Specs that belong to no sprint story (`storyPrefixes`) are quick-flow work outside the sprint. */
+function readQuickSpecs(cfg: BmadConfig, storyPrefixes: Set<string>, notices: Notice[]): Story[] {
+  const stories: Story[] = [];
+  for (const file of specFiles(cfg)) {
+    const prefix = specPrefix(file);
+    if (prefix !== null && storyPrefixes.has(prefix)) continue;
+    const key = path.basename(file, '.md');
+    const text = readText(file) ?? '';
+    let data: Record<string, unknown> = {};
+    let body = text;
+    try {
+      ({ data, body } = readFrontmatter(text));
+    } catch (err) {
+      if (!(err instanceof FrontmatterError)) throw err;
+      notices.push({ level: 'warn', text: `${path.basename(file)}: ${err.message}` });
+    }
+    const raw = rawOf(data.status);
+    const m = mapStatus('v6-spec', raw);
+    const story: Story = {
+      key,
+      id: key,
+      title: textOf(data.title) ?? /^# +(.+?)\s*#*\s*$/m.exec(body)?.[1] ?? key,
+      epicId: QUICK_EPIC_ID,
+      column: m.column,
+      rawStatus: raw,
+      quick: true,
+    };
+    const type = textOf(data.type);
+    if (type !== null) story.type = type;
+    if (m.unknownStatus !== undefined) story.unknownStatus = m.unknownStatus;
+    stories.push(story);
+  }
+  return stories;
 }
 
 interface PlannedStory { key: string; epic: string; num: number; suffix: string; title: string }
@@ -139,6 +193,7 @@ export function readV6Sprint(cfg: BmadConfig, sourceId: string): Board {
 
   const stories: Story[] = [];
   const have = new Set<string>();
+  const prefixes = new Set<string>();
   const addStory = (key: string, epic: string, num: number, suffix: string, title: string, raw: string | null) => {
     const m = mapStatus('v6-sprint', raw);
     const story: Story = {
@@ -152,6 +207,7 @@ export function readV6Sprint(cfg: BmadConfig, sourceId: string): Board {
     if (m.unknownStatus !== undefined) story.unknownStatus = m.unknownStatus;
     stories.push(story);
     have.add(key);
+    prefixes.add(prefixOf(epic, String(num), suffix));
   };
 
   // Join status keys to epic-file stories on (epic, story number, suffix): keys are often renamed,
@@ -195,12 +251,24 @@ export function readV6Sprint(cfg: BmadConfig, sourceId: string): Board {
     if (!matched.has(s) && !have.has(s.key)) addStory(s.key, s.epic, s.num, s.suffix, s.title, null);
   }
 
-  return { sourceId, kind: 'v6-sprint', label: 'v6 sprint', epics: [...epicMap.values()], stories, notices };
+  const quick = readQuickSpecs(cfg, prefixes, notices);
+  const epics = [...epicMap.values()];
+  if (quick.length > 0) epics.push({ id: QUICK_EPIC_ID, title: 'Quick specs', quick: true });
+  return { sourceId, kind: 'v6-sprint', label: 'v6 sprint', epics, stories: [...stories, ...quick], notices };
 }
 
 export function v6SprintDetailPath(cfg: BmadConfig, storyKey: string): string | null {
   // Unicode slugs are valid keys; containment is re-checked against the real path by the caller.
   if (storyKey === '' || storyKey.startsWith('.') || /[/\\\0]/.test(storyKey)) return null;
   const file = path.join(cfg.implementationArtifacts, `${storyKey}.md`);
-  return isFile(file) ? file : null;
+  if (isFile(file)) return file;
+  if (storyKey.startsWith('spec-')) return null;
+  // BMAD 6.12 writes a story's file as spec-<key>.md, or with its own slug after the story number
+  const exact = path.join(cfg.implementationArtifacts, `spec-${storyKey}.md`);
+  if (isFile(exact)) return exact;
+  const m = STORY_KEY_RE.exec(storyKey);
+  if (!m) return null;
+  const prefix = prefixOf(m[1]!, m[2]!, m[3]!);
+  const hits = specFiles(cfg).filter((f) => specPrefix(f) === prefix);
+  return hits.length === 1 ? hits[0]! : null;
 }

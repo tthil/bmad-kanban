@@ -1,7 +1,10 @@
 export type Column = 'backlog' | 'ready' | 'in-progress' | 'review' | 'done' | 'dropped';
 export type SourceKind = 'v6-sprint' | 'v6-spec' | 'v7-initiative' | 'v7-parent' | 'v7-backlog';
 
-export interface Epic { id: string; title: string; status?: string; retrospective?: 'optional' | 'done' }
+export interface Epic {
+  id: string; title: string; status?: string; retrospective?: 'optional' | 'done';
+  quick?: true;           // the v6 lane holding quick-flow specs
+}
 export interface Story {
   key: string;            // unique within the board; used for detail lookup
   id: string;             // display id, e.g. "2.3"
@@ -11,8 +14,9 @@ export interface Story {
   rawStatus: string | null;
   unknownStatus?: string;
   blocked?: boolean;
-  type?: 'story' | 'spike' | 'bug';
+  type?: string;          // v7: story, spike or bug; quick specs: their frontmatter type (feature, bug, ...)
   noFile?: true;          // nothing to open: no story/plan file (or v7 description) yet
+  quick?: true;           // a v6 quick-flow spec (spec-*.md), not part of the sprint
 }
 export interface Notice { level: 'info' | 'warn' | 'error'; text: string }
 export interface Board {

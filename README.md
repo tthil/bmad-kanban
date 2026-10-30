@@ -40,7 +40,7 @@ The project list is stored in a per-user config directory. Set `BMAD_KANBAN_CONF
 
 ## Supported layouts
 
-- **v6 sprint**: `sprint-status.yaml` plus story files in the implementation artifacts folder.
+- **v6 sprint**: `sprint-status.yaml` plus story files in the implementation artifacts folder. A story's own spec file (`spec-2-1-*.md`, as BMAD 6.12 writes them) opens as that story. Other `spec-*.md` files in that folder are quick-flow changes outside the sprint: they show on the same board in a "Quick specs" lane, as tinted cards, and their frontmatter `status` sets the column.
 - **v6 spec**: story files with a `status` in their frontmatter.
 - **v7**: initiatives and tickets (`tickets.toml` and story plan files).
 
