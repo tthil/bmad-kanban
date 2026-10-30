@@ -14,7 +14,8 @@ export function readFrontmatter(text: string): { data: Record<string, unknown>; 
   if (!m) return { data: {}, body: text };
   let parsed: unknown;
   try {
-    parsed = parse(m[1]);
+    // a repeated key (e.g. a status line left behind by an edit) keeps its last value
+    parsed = parse(m[1], { uniqueKeys: false });
   } catch (e) {
     throw new FrontmatterError(`Invalid YAML frontmatter: ${(e as Error).message}`);
   }

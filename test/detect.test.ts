@@ -160,3 +160,14 @@ describe('getStoryDetail', () => {
     await expect(getStoryDetail(d, 'v6-sprint', '9-9-leak')).rejects.toBeInstanceOf(UnknownStoryError);
   });
 });
+
+describe('v6 quick-flow specs', () => {
+  it('appear on the sprint board and open their spec file', async () => {
+    const b = await readBoard(fx('v6-quick'), 'v6-sprint');
+    const spec = b.stories.find((s) => s.key === 'spec-fix-typo');
+    expect(spec).toMatchObject({ quick: true, column: 'done' });
+    expect(spec?.noFile).toBeUndefined();
+    const d = await getStoryDetail(fx('v6-quick'), 'v6-sprint', 'spec-fix-typo');
+    expect(d.markdown).toContain('# Fix the typo in the footer');
+  });
+});

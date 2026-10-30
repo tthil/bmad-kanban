@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadBmadConfig } from '../src/bmad/config.js';
-import { detectV6Sprint, readV6Sprint, v6SprintDetailPath } from '../src/readers/v6Sprint.js';
+import { detectV6Sprint, QUICK_EPIC_ID, readV6Sprint, v6SprintDetailPath } from '../src/readers/v6Sprint.js';
 
 const fx = (n: string) => loadBmadConfig(path.join(import.meta.dirname, 'fixtures', n));
 
@@ -158,5 +158,66 @@ describe('status keys that differ from epic-file keys', () => {
     expect(v6SprintDetailPath(cfg, 'a\\b')).toBeNull();
     expect(v6SprintDetailPath(cfg, 'a\0b')).toBeNull();
     expect(v6SprintDetailPath(cfg, '.hidden')).toBeNull();
+  });
+});
+
+describe('quick-flow specs', () => {
+  const cfg = fx('v6-quick');
+  const board = readV6Sprint(cfg, 'q');
+  const byKey = (k: string) => board.stories.find((s) => s.key === k);
+
+  it('adds spec-*.md files after the sprint stories, in a Quick specs lane', () => {
+    expect(board.stories.map((s) => s.key)).toEqual([
+      '1-1-user-login',
+      'spec-broken',
+      'spec-fix-typo',
+      'spec-gh-2-by-country-catch-up-job',
+    ]);
+    expect(board.epics.at(-1)).toEqual({ id: QUICK_EPIC_ID, title: 'Quick specs', quick: true });
+    expect(byKey('1-1-user-login')?.quick).toBeUndefined();
+  });
+
+  it('reads title, type and status from the frontmatter; a repeated status keeps the last one', () => {
+    expect(byKey('spec-gh-2-by-country-catch-up-job')).toEqual({
+      key: 'spec-gh-2-by-country-catch-up-job',
+      id: 'spec-gh-2-by-country-catch-up-job',
+      title: 'GH #2 -- by-country queue and catch-up in their own job (by-country-catch-up)',
+      epicId: QUICK_EPIC_ID,
+      column: 'in-progress',
+      rawStatus: 'in-progress',
+      type: 'feature',
+      quick: true,
+    });
+  });
+
+  it('falls back to the first heading for the title', () => {
+    expect(byKey('spec-fix-typo')).toMatchObject({ title: 'Fix the typo in the footer', type: 'bug', column: 'done' });
+  });
+
+  it('keeps a spec with broken frontmatter in backlog and warns', () => {
+    expect(byKey('spec-broken')).toMatchObject({ title: 'spec-broken', column: 'backlog', rawStatus: null });
+    expect(board.notices).toEqual([{ level: 'warn', text: expect.stringContaining('spec-broken.md') }]);
+  });
+
+  it('opens the spec file as the card detail', () => {
+    expect(v6SprintDetailPath(cfg, 'spec-fix-typo')).toMatch(/spec-fix-typo\.md$/);
+  });
+
+  it('shows a board for a project with only quick specs', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'v6-quick-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'spec-one.md'), '---\ntitle: One\nstatus: ready-for-dev\n---\n');
+      const only = { ...fx('v6-sprint'), planningArtifacts: path.join(dir, 'none'), implementationArtifacts: dir };
+      expect(detectV6Sprint(only)).toBe(true);
+      const b = readV6Sprint(only, 'o');
+      expect(b.epics).toEqual([{ id: QUICK_EPIC_ID, title: 'Quick specs', quick: true }]);
+      expect(b.stories).toMatchObject([{ key: 'spec-one', title: 'One', column: 'ready', quick: true }]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('adds no Quick specs lane without quick specs', () => {
+    expect(readV6Sprint(fx('v6-sprint'), 's').epics.some((e) => e.quick)).toBe(false);
   });
 });

@@ -11,6 +11,9 @@ describe('readFrontmatter', () => {
   it('returns text untouched without frontmatter', () => {
     expect(readFrontmatter('# T')).toEqual({ data: {}, body: '# T' });
   });
+  it('keeps the last value of a repeated key', () => {
+    expect(readFrontmatter("---\nstatus: 'ready-for-dev'\nstatus: 'in-progress'\n---\n").data).toEqual({ status: 'in-progress' });
+  });
   it('throws FrontmatterError on invalid YAML', () => {
     expect(() => readFrontmatter('---\na: [\n---\nx')).toThrow(FrontmatterError);
   });

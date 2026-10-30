@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import type { BmadConfig } from '../bmad/config.js';
+import { FrontmatterError, readFrontmatter } from '../bmad/frontmatter.js';
 import type { Board, Epic, Notice, Story } from '../model.js';
 import { mapStatus } from '../status.js';
 
@@ -60,8 +61,49 @@ function epicFiles(cfg: BmadConfig): string[] {
   ];
 }
 
+/** Quick-flow specs: `spec-*.md` files written straight into the implementation folder, outside the sprint. */
+function quickSpecFiles(cfg: BmadConfig): string[] {
+  return mdFiles(cfg.implementationArtifacts, (n) => n.startsWith('spec-'));
+}
+
 export function detectV6Sprint(cfg: BmadConfig): boolean {
-  return isFile(path.join(cfg.implementationArtifacts, STATUS_FILE)) || epicFiles(cfg).length > 0;
+  return isFile(path.join(cfg.implementationArtifacts, STATUS_FILE)) || epicFiles(cfg).length > 0 || quickSpecFiles(cfg).length > 0;
+}
+
+export const QUICK_EPIC_ID = 'quick';
+
+const textOf = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+
+function readQuickSpecs(cfg: BmadConfig, notices: Notice[]): Story[] {
+  const stories: Story[] = [];
+  for (const file of quickSpecFiles(cfg)) {
+    const key = path.basename(file, '.md');
+    const text = readText(file) ?? '';
+    let data: Record<string, unknown> = {};
+    let body = text;
+    try {
+      ({ data, body } = readFrontmatter(text));
+    } catch (err) {
+      if (!(err instanceof FrontmatterError)) throw err;
+      notices.push({ level: 'warn', text: `${path.basename(file)}: ${err.message}` });
+    }
+    const raw = rawOf(data.status);
+    const m = mapStatus('v6-spec', raw);
+    const story: Story = {
+      key,
+      id: key,
+      title: textOf(data.title) ?? /^# +(.+?)\s*#*\s*$/m.exec(body)?.[1] ?? key,
+      epicId: QUICK_EPIC_ID,
+      column: m.column,
+      rawStatus: raw,
+      quick: true,
+    };
+    const type = textOf(data.type);
+    if (type !== null) story.type = type;
+    if (m.unknownStatus !== undefined) story.unknownStatus = m.unknownStatus;
+    stories.push(story);
+  }
+  return stories;
 }
 
 interface PlannedStory { key: string; epic: string; num: number; suffix: string; title: string }
@@ -195,7 +237,10 @@ export function readV6Sprint(cfg: BmadConfig, sourceId: string): Board {
     if (!matched.has(s) && !have.has(s.key)) addStory(s.key, s.epic, s.num, s.suffix, s.title, null);
   }
 
-  return { sourceId, kind: 'v6-sprint', label: 'v6 sprint', epics: [...epicMap.values()], stories, notices };
+  const quick = readQuickSpecs(cfg, notices);
+  const epics = [...epicMap.values()];
+  if (quick.length > 0) epics.push({ id: QUICK_EPIC_ID, title: 'Quick specs', quick: true });
+  return { sourceId, kind: 'v6-sprint', label: 'v6 sprint', epics, stories: [...stories, ...quick], notices };
 }
 
 export function v6SprintDetailPath(cfg: BmadConfig, storyKey: string): string | null {
