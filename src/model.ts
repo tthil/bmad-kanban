@@ -17,6 +17,8 @@ export interface Story {
   type?: string;          // v7: story, spike or bug; quick specs: their frontmatter type (feature, bug, ...)
   noFile?: true;          // nothing to open: no story/plan file (or v7 description) yet
   quick?: true;           // a v6 quick-flow spec (spec-*.md), not part of the sprint
+  doneAt?: string;        // own status is done: author date (ISO 8601) of the commit that set it
+  doneUncommitted?: true; // own status is done, but that isn't committed yet
 }
 export interface Notice { level: 'info' | 'warn' | 'error'; text: string }
 export interface Board {
@@ -31,10 +33,13 @@ export interface SourceRef {
   count: number; children?: SourceRef[];
 }
 export interface StoryDetail { path: string | null; markdown: string }
+/** Order of the Done column: by done time (newest or oldest first) or build order. */
+export type DoneSort = 'newest' | 'oldest' | 'build';
 export interface ProjectPrefs {
   view: 'columns' | 'swimlanes';
   showDropped: boolean;
   sourceId: string | null;
+  doneSort: DoneSort;
 }
 export interface ProjectSummary {
   id: string; name: string; path: string; missing: boolean;

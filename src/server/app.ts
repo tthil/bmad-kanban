@@ -228,6 +228,7 @@ export function startServer(opts: ServerOptions): Promise<RunningServer> {
         if (body.view === 'columns' || body.view === 'swimlanes') prefs.view = body.view;
         if (typeof body.showDropped === 'boolean') prefs.showDropped = body.showDropped;
         if (typeof body.sourceId === 'string' || body.sourceId === null) prefs.sourceId = body.sourceId;
+        if (body.doneSort === 'newest' || body.doneSort === 'oldest' || body.doneSort === 'build') prefs.doneSort = body.doneSort;
         registry.setPref(p.id, prefs);
         return sendJson(res, 204);
       }

@@ -7,6 +7,7 @@ import { detectV6Sprint, readV6Sprint, v6SprintDetailPath } from './v6Sprint.js'
 import { findSpecFolders, readV6Spec, v6SpecDetailPath } from './v6Spec.js';
 import { listV7Folders, v7DetailPath, v7EntryText, type V7FolderKind } from './v7Tree.js';
 import { readV7 } from './v7Script.js';
+import { addDoneTimes } from '../git/doneAt.js';
 
 export class UnknownSourceError extends Error {
   constructor(sourceId: string) {
@@ -168,7 +169,13 @@ export async function readBoard(root: string, sourceId: string, opts: ReadOption
   const t = resolveTarget(cfg, sourceId);
   if (t === null) throw new UnknownSourceError(sourceId);
   try {
-    return markNoFile(cfg, t, await loadBoard(cfg, t, opts));
+    const board = markNoFile(cfg, t, await loadBoard(cfg, t, opts));
+    try {
+      await markDone(cfg, t, board);
+    } catch {
+      // no done times, never a board error
+    }
+    return board;
   } catch (e) {
     return {
       sourceId,
@@ -211,6 +218,20 @@ function markNoFile(cfg: BmadConfig, t: Target, board: Board): Board {
     if (ct !== null) markNoFile(cfg, ct, c);
   }
   return board;
+}
+
+/** Add `doneAt` / `doneUncommitted` from git history to stories whose own status is `done`. */
+async function markDone(cfg: BmadConfig, t: Target, board: Board): Promise<void> {
+  const fileOf = (s: { key: string }): string | null => {
+    const file = detailFile(cfg, t, s.key);
+    return file !== null && inside(cfg.root, file) ? file : null;
+  };
+  const jobs: Promise<void>[] = [addDoneTimes(cfg, t.type, board, fileOf)];
+  for (const c of board.children ?? []) {
+    const ct = resolveTarget(cfg, c.sourceId);
+    if (ct !== null) jobs.push(markDone(cfg, ct, c));
+  }
+  await Promise.all(jobs);
 }
 
 export async function getStoryDetail(

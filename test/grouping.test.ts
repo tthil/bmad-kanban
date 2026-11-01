@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { loadBmadConfig } from '../src/bmad/config.js';
 import type { Board, Story } from '../src/model.js';
 import { readV6Sprint } from '../src/readers/v6Sprint.js';
-import { byColumn, copyText, epicColor, swimlanes } from '../web/grouping.js';
+import { byColumn, copyText, epicColor, sortDone, swimlanes } from '../web/grouping.js';
 
 const story = (key: string, column: Story['column'], epicId: string | null = '1'): Story => ({
   key, id: key, title: key, epicId, column, rawStatus: column,
@@ -81,5 +81,58 @@ describe('copyText', () => {
 
   it('trims surrounding whitespace from the title', () => {
     expect(copyText({ ...story('x', 'backlog'), id: '3', title: '  Only story \n' })).toBe('3 Only story');
+  });
+});
+
+describe('sortDone', () => {
+  const d = (key: string, doneAt?: string, uncommitted = false): Story => ({
+    ...story(key, 'done'), ...(doneAt ? { doneAt } : {}), ...(uncommitted ? { doneUncommitted: true as const } : {}),
+  });
+  // build order: a b c d e f
+  const cards = [
+    d('a', '2026-10-20T09:00:00Z'),
+    d('b'),
+    d('c', '2026-10-28T14:05:00Z'),
+    d('d', undefined, true),
+    d('e', '2026-10-20T09:00:00Z'),
+    d('f'),
+  ];
+  const keys = (xs: Story[]) => xs.map((s) => s.key);
+
+  it('newest: not committed, then dated newest first (ties in build order), then undated in build order', () => {
+    expect(keys(sortDone(cards, 'newest'))).toEqual(['d', 'c', 'a', 'e', 'b', 'f']);
+  });
+  it('oldest: dated oldest first (ties in build order), then not committed, then undated', () => {
+    expect(keys(sortDone(cards, 'oldest'))).toEqual(['a', 'e', 'c', 'd', 'b', 'f']);
+  });
+  it('build: unchanged', () => {
+    expect(keys(sortDone(cards, 'build'))).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
+  });
+  it('compares instants across time zone offsets and treats a bad date as undated', () => {
+    const xs = [d('x', '2026-10-28T10:00:00+02:00'), d('y', '2026-10-28T09:00:00Z'), d('z', 'not a date')];
+    expect(keys(sortDone(xs, 'newest'))).toEqual(['y', 'x', 'z']);
+  });
+  it('does not change its input', () => {
+    const copy = [...cards];
+    sortDone(cards, 'newest');
+    expect(cards).toEqual(copy);
+  });
+
+  it('orders the Done column of byColumn and of every swimlane, and leaves other columns alone', () => {
+    const xs = [
+      { ...d('p', '2026-10-20T09:00:00Z'), epicId: '2' },
+      { ...d('q', '2026-10-28T09:00:00Z'), epicId: '2' },
+      { ...story('r', 'review'), epicId: '2' },
+      { ...story('s', 'review'), epicId: '2' },
+    ];
+    expect(keys(byColumn(xs, false, null, 'newest').done)).toEqual(['q', 'p']);
+    expect(keys(byColumn(xs, false, null).done)).toEqual(['p', 'q']);
+    const lane = swimlanes(board(xs), false, 'newest').find((l) => l.epic?.id === '2')!;
+    expect(keys(lane.cells.done)).toEqual(['q', 'p']);
+    expect(keys(lane.cells.review)).toEqual(['r', 's']);
+    expect(keys(swimlanes(board(xs), false, 'oldest').find((l) => l.epic?.id === '2')!.cells.done)).toEqual(['p', 'q']);
+  });
+  it('returns a new array in build order too', () => {
+    expect(sortDone(cards, 'build')).not.toBe(cards);
   });
 });

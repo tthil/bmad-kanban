@@ -28,7 +28,7 @@ export function configDir(): string {
   return process.env.BMAD_KANBAN_CONFIG_DIR || envPaths('bmad-kanban', { suffix: '' }).config;
 }
 
-const defaultPrefs = (): ProjectPrefs => ({ view: 'columns', showDropped: false, sourceId: null });
+const defaultPrefs = (): ProjectPrefs => ({ view: 'columns', showDropped: false, sourceId: null, doneSort: 'newest' });
 const copy = (p: RegisteredProject): RegisteredProject => ({ ...p, prefs: { ...p.prefs } });
 
 export class Registry {
