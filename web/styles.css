@@ -157,10 +157,14 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .col-head {
   margin: 0 0 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted);
 }
+.col-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 6px; margin: 0 0 8px; }
+.col-top .col-head { margin: 0; }
+.lane-col-top { margin: 0; }
+.done-sort { font: inherit; font-size: 11px; padding: 1px 4px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: var(--text); max-width: 100%; }
 
 /* swimlanes */
 .lanes { display: grid; gap: 6px; min-width: min-content; align-items: stretch; }
-.lanes > .col-head { padding: 0 6px; margin: 0; align-self: end; }
+.lanes > .col-top { padding: 0 6px; align-self: end; }
 .lane-head { padding: 6px 8px; border-left: 4px solid; background: var(--surface); border-radius: 6px; }
 .lane-title { font-weight: 600; font-size: 13px; }
 .lane-meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: 2px; }

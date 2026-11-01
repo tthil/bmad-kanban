@@ -61,6 +61,8 @@ An unknown status goes to Backlog with an "unknown status: X" badge.
 
 A Done card whose own status is `done` shows when it was finished. BMAD doesn't record that time, so the board reads it from git: the author date of the newest commit that set the card's status line to `done` (in `sprint-status.yaml`, or in the frontmatter of its spec, story or plan file). If that `done` isn't committed yet, the card shows a "not committed" hint instead. Outside a git repo, or for files git ignores, nothing is shown. Done times need `git` on your PATH and use the commit's author date (not the committer date, which a rebase rewrites). The board only reads git history and never changes the repo.
 
+The Done column has a sort menu: **Newest first** (the default), **Oldest first** or **Build order**. Newest first puts "not committed" cards at the top; Oldest first puts them after the dated cards. Cards without a time always come last, in build order. The choice is saved per project and applies to both views.
+
 ## Development
 
 ```sh

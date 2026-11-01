@@ -1,17 +1,25 @@
-import type { Board, Story } from '../src/model.js';
+import type { Board, DoneSort, Story } from '../src/model.js';
 import { Card } from './Card.js';
-import { epicIndex, visibleColumns } from './ColumnsView.js';
+import { DoneSortSelect, epicIndex, visibleColumns } from './ColumnsView.js';
 import { COLUMN_LABELS, epicColor, swimlanes } from './grouping.js';
 
-export function SwimlaneView(props: { board: Board; showDropped: boolean; onOpen: (s: Story, sourceId: string) => void }) {
+export function SwimlaneView(props: {
+  board: Board; showDropped: boolean; doneSort: DoneSort; onDoneSort: (v: DoneSort) => void;
+  onOpen: (s: Story, sourceId: string) => void;
+}) {
   const { board } = props;
   const cols = visibleColumns(props.showDropped);
-  const lanes = swimlanes(board, props.showDropped);
+  const lanes = swimlanes(board, props.showDropped, props.doneSort);
   const epics = epicIndex(board);
   return (
     <div class="lanes" style={{ gridTemplateColumns: `minmax(140px, 180px) repeat(${cols.length}, minmax(140px, 1fr))` }}>
       <div class="lane-corner" />
-      {cols.map((c) => <h3 class="col-head" key={c}>{COLUMN_LABELS[c]}</h3>)}
+      {cols.map((c) => (
+        <div class="col-top lane-col-top" key={c}>
+          <h3 class="col-head">{COLUMN_LABELS[c]}</h3>
+          {c === 'done' && <DoneSortSelect value={props.doneSort} onChange={props.onDoneSort} />}
+        </div>
+      ))}
       {lanes.map((lane) => {
         const info = lane.epic ? epics.get(lane.epic.id) : undefined;
         const pct = lane.total === 0 ? 0 : Math.round((lane.done / lane.total) * 100);

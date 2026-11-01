@@ -33,10 +33,13 @@ export interface SourceRef {
   count: number; children?: SourceRef[];
 }
 export interface StoryDetail { path: string | null; markdown: string }
+/** Order of the Done column: by done time (newest or oldest first) or build order. */
+export type DoneSort = 'newest' | 'oldest' | 'build';
 export interface ProjectPrefs {
   view: 'columns' | 'swimlanes';
   showDropped: boolean;
   sourceId: string | null;
+  doneSort: DoneSort;
 }
 export interface ProjectSummary {
   id: string; name: string; path: string; missing: boolean;

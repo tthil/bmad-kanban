@@ -41,6 +41,13 @@ describe('Registry', () => {
     expect(new Registry(file).list()[0]!.trusted).toBe(true); // listed before trust existed
   });
 
+  it('gives projects saved before doneSort existed the default', () => {
+    const prefs = { view: 'swimlanes', showDropped: true, sourceId: null };
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ version: 1, projects: [{ id: 'a', path: fixture, name: 'x', prefs }] }));
+    expect(new Registry(file).list()[0]!.prefs).toEqual({ ...prefs, doneSort: 'newest' });
+  });
+
   it('rejects non-BMAD and missing paths', () => {
     const reg = new Registry(file);
     expect(() => reg.add(tmp)).toThrow(NotABmadProjectError);
@@ -50,11 +57,11 @@ describe('Registry', () => {
   it('defaults prefs and persists them with lastViewed', () => {
     const reg = new Registry(file);
     const p = reg.add(fixture);
-    expect(p.prefs).toEqual({ view: 'columns', showDropped: false, sourceId: null });
+    expect(p.prefs).toEqual({ view: 'columns', showDropped: false, sourceId: null, doneSort: 'newest' });
     reg.setPref(p.id, { view: 'swimlanes', showDropped: true });
     reg.setLastViewed(p.id);
     const again = new Registry(file);
-    expect(again.get(p.id)?.prefs).toEqual({ view: 'swimlanes', showDropped: true, sourceId: null });
+    expect(again.get(p.id)?.prefs).toEqual({ view: 'swimlanes', showDropped: true, sourceId: null, doneSort: 'newest' });
     expect(again.lastViewed).toBe(p.id);
   });
 
@@ -77,7 +84,7 @@ describe('Registry', () => {
     const p = reg.add(fixture);
     p.prefs.view = 'swimlanes';
     reg.get(p.id)!.prefs.showDropped = true;
-    expect(reg.get(p.id)?.prefs).toEqual({ view: 'columns', showDropped: false, sourceId: null });
+    expect(reg.get(p.id)?.prefs).toEqual({ view: 'columns', showDropped: false, sourceId: null, doneSort: 'newest' });
   });
 
   it('moves a corrupt file to .bak and starts empty', () => {

@@ -127,3 +127,15 @@ test('copies a card\'s id and title to the clipboard', async ({ page, context })
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('1.1 User login');
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
+
+test('the Done column sort choice is saved per project', async ({ page }) => {
+  await page.goto(base);
+  const sidebar = page.getByRole('navigation', { name: 'Projects' });
+  await sidebar.getByRole('button', { name: /v6 sprint/ }).click();
+  const sort = page.getByRole('region', { name: 'Done' }).getByRole('combobox', { name: 'Sort done cards' });
+  await expect(sort).toHaveValue('newest');
+  await sort.selectOption('oldest');
+  await page.reload();
+  await sidebar.getByRole('button', { name: /v6 sprint/ }).click();
+  await expect(page.getByRole('region', { name: 'Done' }).getByRole('combobox', { name: 'Sort done cards' })).toHaveValue('oldest');
+});

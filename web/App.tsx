@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import type { Board, Epic, ProjectPrefs, ProjectSummary, SourceRef, Story } from '../src/model.js';
+import type { Board, DoneSort, Epic, ProjectPrefs, ProjectSummary, SourceRef, Story } from '../src/model.js';
 import { api, ApiError } from './api.js';
 import { EpicChip } from './Card.js';
 import { CardDetail } from './CardDetail.js';
 import { ColumnsView } from './ColumnsView.js';
+import { isDoneSort } from './grouping.js';
 import { Sidebar } from './Sidebar.js';
 import { SwimlaneView } from './SwimlaneView.js';
 
@@ -23,7 +24,8 @@ const hasDropped = (b: Board): boolean => [b, ...(b.children ?? [])].some((x) =>
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 function BoardBody(props: {
-  board: Board; view: View; showDropped: boolean; epicFilter: string | null; onOpen: (s: Story, sourceId: string) => void;
+  board: Board; view: View; showDropped: boolean; epicFilter: string | null;
+  doneSort: DoneSort; onDoneSort: (v: DoneSort) => void; onOpen: (s: Story, sourceId: string) => void;
 }) {
   const { board, view } = props;
   const one = (b: Board) => (
@@ -32,9 +34,10 @@ function BoardBody(props: {
       {b.stories.length === 0 ? (
         <p class="muted empty">No stories in this board yet.</p>
       ) : view === 'columns' ? (
-        <ColumnsView board={b} showDropped={props.showDropped} epicFilter={props.epicFilter} onOpen={props.onOpen} />
+        <ColumnsView board={b} showDropped={props.showDropped} epicFilter={props.epicFilter}
+          doneSort={props.doneSort} onDoneSort={props.onDoneSort} onOpen={props.onOpen} />
       ) : (
-        <SwimlaneView board={b} showDropped={props.showDropped} onOpen={props.onOpen} />
+        <SwimlaneView board={b} showDropped={props.showDropped} doneSort={props.doneSort} onDoneSort={props.onDoneSort} onOpen={props.onOpen} />
       )}
     </>
   );
@@ -59,6 +62,7 @@ export function App() {
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [view, setView] = useState<View>('columns');
   const [showDropped, setShowDropped] = useState(false);
+  const [doneSort, setDoneSort] = useState<DoneSort>('newest');
   const [epicFilter, setEpicFilter] = useState<string | null>(null);
   // a loaded board (or error) is tagged with the selection it belongs to, so a stale one is never shown
   const [loaded, setLoaded] = useState<{ key: string; board: Board | null; error: string | null } | null>(null);
@@ -76,6 +80,7 @@ export function App() {
     setSourceId(pickSource(p, wantedSource));
     setView(p.prefs?.view ?? 'columns');
     setShowDropped(p.prefs?.showDropped ?? false);
+    setDoneSort(isDoneSort(p.prefs?.doneSort) ? p.prefs.doneSort : 'newest');
     setEpicFilter(null);
     setDetail(null);
     const url = new URL(location.href);
@@ -85,7 +90,7 @@ export function App() {
   }, []);
 
   const savePrefs = useCallback((id: string, prefs: Partial<ProjectPrefs>) => {
-    setProjects((ps) => ps && ps.map((p) => (p.id === id ? { ...p, prefs: { ...(p.prefs ?? { view: 'columns', showDropped: false, sourceId: null }), ...prefs } } : p)));
+    setProjects((ps) => ps && ps.map((p) => (p.id === id ? { ...p, prefs: { ...(p.prefs ?? { view: 'columns', showDropped: false, sourceId: null, doneSort: 'newest' }), ...prefs } } : p)));
     api.setPrefs(id, prefs).catch(() => {});
   }, []);
 
@@ -206,6 +211,10 @@ export function App() {
     setView(v);
     if (selectedId) savePrefs(selectedId, { view: v });
   };
+  const changeDoneSort = (v: DoneSort) => {
+    setDoneSort(v);
+    if (selectedId) savePrefs(selectedId, { doneSort: v });
+  };
   const changeDropped = (on: boolean) => {
     setShowDropped(on);
     if (selectedId) savePrefs(selectedId, { showDropped: on });
@@ -288,7 +297,7 @@ export function App() {
                 <p class="muted empty">Loading…</p>
               ) : (
                 <BoardBody board={board} view={view} showDropped={showDropped && dropped} epicFilter={activeFilter}
-                  onOpen={(story, sid) => setDetail({ story, sourceId: sid })} />
+                  doneSort={doneSort} onDoneSort={changeDoneSort} onOpen={(story, sid) => setDetail({ story, sourceId: sid })} />
               )}
             </div>
           </>
