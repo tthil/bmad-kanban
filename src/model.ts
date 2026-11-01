@@ -17,6 +17,8 @@ export interface Story {
   type?: string;          // v7: story, spike or bug; quick specs: their frontmatter type (feature, bug, ...)
   noFile?: true;          // nothing to open: no story/plan file (or v7 description) yet
   quick?: true;           // a v6 quick-flow spec (spec-*.md), not part of the sprint
+  doneAt?: string;        // own status is done: author date (ISO 8601) of the commit that set it
+  doneUncommitted?: true; // own status is done, but that isn't committed yet
 }
 export interface Notice { level: 'info' | 'warn' | 'error'; text: string }
 export interface Board {

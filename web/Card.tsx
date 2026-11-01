@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Epic, Story } from '../src/model.js';
-import { copyText, epicColor } from './grouping.js';
+import { copyText, doneLabel, epicColor } from './grouping.js';
 
 export interface EpicInfo { epic: Epic; index: number }
 
@@ -55,6 +55,18 @@ function CopyButton({ story }: { story: Story }) {
   );
 }
 
+function DoneTime({ story: s }: { story: Story }) {
+  if (s.column !== 'done') return null;
+  if (s.doneAt !== undefined) {
+    const label = doneLabel(s.doneAt);
+    if (label === null) return null;
+    const full = new Date(s.doneAt).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'long' });
+    return <span class="card-done" title={`Done ${full}`}>✓ {label}</span>;
+  }
+  if (s.doneUncommitted) return <span class="badge uncommitted" title="Marked done but not committed yet">not committed</span>;
+  return null;
+}
+
 export function Card(props: { story: Story; epic: EpicInfo | null; showEpic: boolean; onOpen: (s: Story) => void }) {
   const { story: s, epic } = props;
   const cls = `card${s.column === 'dropped' ? ' dropped' : ''}${s.noFile ? ' no-file' : ''}${s.quick ? ' quick' : ''}`;
@@ -69,6 +81,7 @@ export function Card(props: { story: Story; epic: EpicInfo | null; showEpic: boo
         {badge !== undefined && <span class={`badge type-${badge}`}>{badge}</span>}
       </span>
       <span class="card-title">{s.title}</span>
+      <DoneTime story={s} />
       {s.unknownStatus !== undefined && <span class="badge unknown">unknown status: {s.unknownStatus}</span>}
     </>
   );

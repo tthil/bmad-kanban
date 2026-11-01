@@ -55,3 +55,12 @@ export function copyText(story: Story): string {
   const title = story.title.trim();
   return title === story.key ? title : `${story.id} ${title}`;
 }
+
+/** `28 Oct, 14:05`, with the year when it isn't the current one. */
+export function doneLabel(iso: string, now = new Date()): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false };
+  if (d.getFullYear() !== now.getFullYear()) opts.year = 'numeric';
+  return d.toLocaleString('en-GB', opts);
+}

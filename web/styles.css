@@ -214,6 +214,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .card.quick .badge { background: rgba(127, 127, 127, 0.16); color: var(--text); }
 .card.quick .badge.type-bug { background: var(--danger-soft); color: var(--danger); }
 .lane-head.quick { border-left-style: dashed; }
+.card-done { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.badge.uncommitted { align-self: flex-start; background: rgba(127, 127, 127, 0.16); color: var(--muted); }
 .badge.unknown { align-self: flex-start; background: var(--warn-soft); color: var(--warn); }
 
 /* modal */

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { loadBmadConfig, type BmadConfig } from '../bmad/config.js';
+import { gitDirOf } from '../git/doneAt.js';
 
 export type Unwatch = (() => void) & { ready: Promise<void> };
 
@@ -86,12 +87,36 @@ export function watchProject(projectRoot: string, onChange: () => void): Unwatch
     return new Promise<void>((resolve) => w.once('ready', () => resolve()));
   };
 
-  const ready = start();
+  // `.git` is ignored above, so a commit alone wouldn't refresh the board: watch the HEAD reflog too.
+  let gitWatcher: FSWatcher | null = null;
+  const startGit = async (): Promise<void> => {
+    if (!fs.existsSync(root)) return;
+    const gitDir = await gitDirOf(root);
+    if (gitDir === null || closed) return;
+    const logs = path.join(gitDir, 'logs');
+    const reflog = path.join(logs, 'HEAD');
+    const w = chokidar.watch(gitDir, {
+      ignoreInitial: true,
+      depth: 1,
+      ignored: (p: string) => {
+        const abs = path.resolve(p);
+        return abs !== gitDir && abs !== logs && abs !== reflog;
+      },
+    });
+    gitWatcher = w;
+    w.on('all', fire);
+    w.on('error', (e) => console.error('watch error:', e));
+    await new Promise<void>((resolve) => w.once('ready', () => resolve()));
+  };
+
+  const ready = Promise.all([start(), startGit().catch(() => undefined)]).then(() => undefined);
   const stop = () => {
     closed = true;
     if (timer) clearTimeout(timer);
     if (watcher) void watcher.close();
     watcher = null;
+    if (gitWatcher) void gitWatcher.close();
+    gitWatcher = null;
   };
   return Object.assign(stop, { ready });
 }

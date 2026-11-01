@@ -59,6 +59,8 @@ A project can have more than one layout (typically mid-migration). Each source g
 
 An unknown status goes to Backlog with an "unknown status: X" badge.
 
+A Done card whose own status is `done` shows when it was finished. BMAD doesn't record that time, so the board reads it from git: the author date of the newest commit that set the card's status line to `done` (in `sprint-status.yaml`, or in the frontmatter of its spec, story or plan file). If that `done` isn't committed yet, the card shows a "not committed" hint instead. Outside a git repo, or for files git ignores, nothing is shown. Done times need `git` on your PATH and use the commit's author date (not the committer date, which a rebase rewrites). The board only reads git history and never changes the repo.
+
 ## Development
 
 ```sh
