@@ -2,6 +2,8 @@
 
 A read-only Kanban board for [BMAD Method](https://github.com/bmad-code-org/BMAD-METHOD) projects. It runs locally, reads your project's BMAD files, and shows stories as cards in Backlog, Ready, In progress, Review and Done columns, with optional epic swimlanes. It updates live when files change. Cards with a file icon have a story file: click one to read it; hover a card and click **Copy** to put its id and title (e.g. `1.2 Tax rules`) on the clipboard, ready to paste into your BMAD agent.
 
+![The board in columns view, with cards in Backlog, Ready, In progress, Review and Done](https://raw.githubusercontent.com/tthil/bmad-kanban/main/docs/screenshots/board-columns.png)
+
 It never writes to your project. Remove a project from the sidebar and only the board's own list changes; your folder is not touched.
 
 > **Note:** for BMAD v7 projects the board runs the project's own `_bmad/method/scripts/tickets.py` (through `uv`) to read ticket state. That script comes from the project, so opening a project you don't trust runs its code. Use `--no-scripts` for those projects.
@@ -38,6 +40,14 @@ Requirements: Node 22 or newer. `uv` is needed for full BMAD v7 fidelity (the bo
 
 The project list is stored in a per-user config directory. Set `BMAD_KANBAN_CONFIG_DIR` to use a different one. Use the × next to a project in the sidebar to remove it from the list.
 
+## Views
+
+Group cards by epic with the swimlanes view, which shows each epic's progress. The board follows your system's light or dark setting.
+
+![The swimlanes view, with one row per epic and a progress bar for each](https://raw.githubusercontent.com/tthil/bmad-kanban/main/docs/screenshots/board-swimlanes.png)
+
+![The columns view in dark mode](https://raw.githubusercontent.com/tthil/bmad-kanban/main/docs/screenshots/board-dark.png)
+
 ## Supported layouts
 
 - **v6 sprint**: `sprint-status.yaml` plus story files in the implementation artifacts folder. A story's own spec file (`spec-2-1-*.md`, as BMAD 6.12 writes them) opens as that story. Other `spec-*.md` files in that folder are quick-flow changes outside the sprint: they show on the same board in a "Quick specs" lane, as tinted cards, and their frontmatter `status` sets the column.
@@ -63,6 +73,8 @@ A Done card whose own status is `done` shows when it was finished. BMAD doesn't 
 
 The Done column has a sort menu: **Newest first** (the default), **Oldest first** or **Build order**. Newest first puts "not committed" cards at the top; Oldest first puts them after the dated cards. Cards without a time always come last, in build order. The choice is saved per project and applies to both views.
 
+<img src="https://raw.githubusercontent.com/tthil/bmad-kanban/main/docs/screenshots/done-column.png" alt="The Done column with its sort menu, finish times on the cards and a 'not committed' badge" width="191">
+
 ## Development
 
 ```sh
@@ -70,7 +82,9 @@ npm install
 npm test          # unit tests (vitest)
 npm run typecheck
 npm run build     # dist/cli.js and dist/web
+npx playwright install chromium  # once, for the two commands below
 npm run test:e2e  # Playwright smoke test; run the build first
+npm run screenshots  # after UI changes: rebuild and regenerate the images in docs/screenshots
 ```
 
 ### Releasing
